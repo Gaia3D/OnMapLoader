@@ -4,7 +4,7 @@
 import sys
 
 # import OGR
-from osgeo import ogr
+from osgeo import ogr, gdal
 
 # use OGR specific exceptions
 ogr.UseExceptions()
@@ -23,16 +23,35 @@ except Exception, e:
 layerInfoList = []
 
 # parsing layers by index
+# 레이어 ID, 레이어 이름, 객체 수, 지오매트리 유형
 for iLayer in range(pdf.GetLayerCount()):
     layer = pdf.GetLayerByIndex(iLayer)
-    layerInfoList.append({'id': iLayer, 'name': layer.GetName()})
+    name = layer.GetName()
+    totalFeatureCnt = layer.GetFeatureCount()
+    pointCount = 0
+    lineCount = 0
+    curveCount = 0
+    polygonCount = 0
+    for feature in layer:
+        geometry = feature.GetGeometryRef()
+        geomType = geometry.GetGeometryType()
+        if geomType == ogr.wkbPoint or geomType == ogr.wkbMultiPoint :
+            pointCount += 1
+        elif geomType == ogr.wkbLineString or geomType == ogr.wkbMultiLineString:
+            lineCount += 1
+        elif geomType == ogr.wkbPolygon or geomType == ogr.wkbMultiPolygon:
+            polygonCount += 1
+        else:
+            print("[Unknown Type] "+ogr.GeometryTypeToName(geomType))
 
-# sorting
-layerInfoList.sort()
+    layerInfoList.append({'id': iLayer, 'name': name, "totalCount": totalFeatureCnt,
+                          "pointCount": pointCount, "lineCount": lineCount, "polygonCount": polygonCount})
 
 # printing
 for layerInfo in layerInfoList:
-    print("ID: {}, NAME: {}".format(layerInfo["id"], layerInfo["name"]))
+    print("ID: {}, NAME: {}, TotalCount: {}, PointCount: {}, LineCount: {}, PolygonCount: {}".format(
+        layerInfo["id"], layerInfo["name"], layerInfo["totalCount"],
+        layerInfo["pointCount"], layerInfo["lineCount"], layerInfo["polygonCount"]))
 
 # exit(0)
 
@@ -43,10 +62,6 @@ memFile = outDriver.CreateDataSource('memData')
 # open the memory datasource with write access
 tmp = outDriver.Open('memData', 1)
 
-# 33 지도정보_건물_건물 8884 LineString
-# 32 지도정보_건물_건물명 1 Point
-# 32 지도정보_건물_건물명 84 LineString
-# 32 지도정보_건물_건물명 476 Polygon
 testLayerId = 33
 testLayerName = "PDF Layer"
 
