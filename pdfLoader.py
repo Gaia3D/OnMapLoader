@@ -9,6 +9,12 @@ from osgeo import ogr, gdal
 # To avoid 'QVariant' is not defined error
 from PyQt4.QtCore import *
 
+import re
+
+#
+LAYER_FILTER = re.compile(u"^지도정보_")
+MAP_BOX_LAYER = u"지도정보_도곽"
+
 # 캔버스 초기화
 QgsMapLayerRegistry.instance().removeAllMapLayers()
 canvas = iface.mapCanvas()
@@ -54,14 +60,19 @@ for iLayer in range(pdf.GetLayerCount()):
     layerInfoList.append({'id': iLayer, 'name': name, "totalCount": totalFeatureCnt,
                           "pointCount": pointCount, "lineCount": lineCount, "polygonCount": polygonCount})
 
+crsWkt = QgsCoordinateReferenceSystem(crsId).toWkt()
+crsId = 5179
+
 # Create QGIS Layer
 for layerInfo in layerInfoList:
-    crsId = 5179
-    crsWkt = QgsCoordinateReferenceSystem(crsId).toWkt()
 
     vPointLayer = None
     vLineLayer = None
     vPolygonLayer = None
+
+    # 지도정보_ 로 시작하는 레이어만 임포트
+    if not LAYER_FILTER.match(layerInfo["name"]) :
+        continue
 
     # Geometry Type 별 레이어 생성
     if layerInfo["pointCount"] > 0:
@@ -86,30 +97,25 @@ for layerInfo in layerInfoList:
     pdfLayer = pdf.GetLayerByIndex(layerInfo["id"])
     # 한번 읽은 레이어는 읽음 포인터를 시작점으로 돌려야 다시 읽을 수 있다.
     pdfLayer.ResetReading()
-    idPointLayer = 1
-    idLineLayer = 1
-    idPolygonLayer = 1
-    for feature in pdfLayer:
-        geometry = feature.GetGeometryRef()
+    for ogrFeature in pdfLayer:
+        geometry = ogrFeature.GetGeometryRef()
         geomType = geometry.GetGeometryType()
         geomWkb = geometry.ExportToWkb()
+        fid = ogrFeature.GetFID()
 
-        feature = QgsFeature()
+        qgisFeature = QgsFeature()
         qgisGeom = QgsGeometry()
         qgisGeom.fromWkb(geomWkb)
-        feature.setGeometry(qgisGeom)
-        if geomType == ogr.wkbPoint or geomType == ogr.wkbMultiPoint :
-            feature.setAttributes([idPointLayer])
-            vPointLayer.dataProvider().addFeatures([feature])
-            idPointLayer += 1
+        qgisFeature.setGeometry(qgisGeom)
+        if geomType == ogr.wkbPoint or geomType == ogr.wkbMultiPoint:
+            qgisFeature.setAttributes([fid])
+            vPointLayer.dataProvider().addFeatures([qgisFeature])
         elif geomType == ogr.wkbLineString or geomType == ogr.wkbMultiLineString:
-            feature.setAttributes([idLineLayer])
-            vLineLayer.dataProvider().addFeatures([feature])
-            idLineLayer += 1
+            qgisFeature.setAttributes([fid])
+            vLineLayer.dataProvider().addFeatures([qgisFeature])
         elif geomType == ogr.wkbPolygon or geomType == ogr.wkbMultiPolygon:
-            feature.setAttributes([idPolygonLayer])
-            vPolygonLayer.dataProvider().addFeatures([feature])
-            idPolygonLayer += 1
+            qgisFeature.setAttributes([fid])
+            vPolygonLayer.dataProvider().addFeatures([qgisFeature])
 
 if vPointLayer:
     canvas.setExtent(vPointLayer.extent())
