@@ -5,7 +5,7 @@ import sys, os
 
 # import OGR
 from osgeo import ogr, gdal
-from pyproj import Proj
+from pyproj import Proj, transform
 
 # To avoid 'QVariant' is not defined error
 from PyQt4.QtCore import *
@@ -39,10 +39,10 @@ def findConner(points):
     distTR = None
 
     for point in points:
-        tmpDistLL = sqrt((point[0]-xMin)**2 + (point[1]-yMax)**2)
-        tmpDistLR = sqrt((point[0]-xMax)**2 + (point[1]-yMax)**2)
-        tmpDistTL = sqrt((point[0]-xMin)**2 + (point[1]-yMin)**2)
-        tmpDistTR = sqrt((point[0]-xMax)**2 + (point[1]-yMin)**2)
+        tmpDistLL = (point[0]-xMin)**2 + (point[1]-yMax)**2
+        tmpDistLR = (point[0]-xMax)**2 + (point[1]-yMax)**2
+        tmpDistTL = (point[0]-xMin)**2 + (point[1]-yMin)**2
+        tmpDistTR = (point[0]-xMax)**2 + (point[1]-yMin)**2
 
         if not distLL or distLL > tmpDistLL:
             distLL = tmpDistLL
@@ -69,7 +69,7 @@ def findMapNo(fileBase):
         return None
 
 
-def getMapBox(mapNo):
+def mapNoToMapBox(mapNo):
     if not isinstance(mapNo, basestring):
         return None
 
@@ -135,11 +135,11 @@ def calcTranform(srcP1, srcP2, srcP3, srcP4, tgtP1, tgtP2, tgtP3, tgtP4):
     # to find our transformation matrix A
     A, res, rank, s = np.linalg.lstsq(X, Y)
 
-    transform = lambda x: unpad(np.dot(pad(x), A))
-    return transform
+    npTransform = lambda x: unpad(np.dot(pad(x), A))
+    return npTransform
 
 
-def importPdf(pdfFilePath):
+def getPdfInformation(pdfFilePath):
     # get the driver
     srcDriver = ogr.GetDriverByName("PDF")
 
@@ -151,7 +151,7 @@ def importPdf(pdfFilePath):
         return
 
     mapNo = os.path.splitext(findMapNo(os.path.basename(pdfFilePath)))[0]
-    boxLL, boxLR, boxTL, boxTR = getMapBox(mapNo)
+    boxLL, boxLR, boxTL, boxTR = mapNoToMapBox(mapNo)
     print(boxLL, boxLR, boxTL, boxTR)
 
     # 좌표계 판단
@@ -195,15 +195,16 @@ def importPdf(pdfFilePath):
         for feature in pdfLayer:
             geometry = feature.GetGeometryRef()
             geomType = geometry.GetGeometryType()
-            if geomType == ogr.wkbPoint or geomType == ogr.wkbMultiPoint :
+            if geomType == ogr.wkbPoint or geomType == ogr.wkbMultiPoint:
                 pointCount += 1
             elif geomType == ogr.wkbLineString or geomType == ogr.wkbMultiLineString:
                 lineCount += 1
             elif geomType == ogr.wkbPolygon or geomType == ogr.wkbMultiPolygon:
                 polygonCount += 1
             else:
-                print(u"[Unknown Type] "+ogr.GeometryTypeToName(geomType))
+                print(u"[Unknown Type] " + ogr.GeometryTypeToName(geomType))
 
+            # 도곽을 찾아 정보 추출
             if mapBoxLayerId and not mapBoxGeometry:
                 if geometry.GetPointCount() == 5:
                     if geometry.GetX(0) == geometry.GetX(4) and geometry.GetY(0) == geometry.GetY(4):
@@ -219,14 +220,26 @@ def importPdf(pdfFilePath):
 
     print (pntLL, pntLR, pntTL, pntTR)
 
-    transform = calcTranform(pntLL, pntLR, pntTL, pntTR, tmBoxLL, tmBoxLR, tmBoxTL, tmBoxTR)
+    npTransform = calcTranform(pntLL, pntLR, pntTL, pntTR, tmBoxLL, tmBoxLR, tmBoxTL, tmBoxTR)
 
-    # TEST
-    # return
+    del pdf
 
-    # clear canvas
-    QgsMapLayerRegistry.instance().removeAllMapLayers()
-    canvas = iface.mapCanvas()
+    return  layerInfoList, npTransform, crsId, mapNo, (tmBoxLL, tmBoxLR, tmBoxTL, tmBoxTR)
+
+
+def importPdf(pdfFilePath):
+    # PDF에서 레이어와 좌표계 변환 정보 추출
+    layerInfoList, npTransform, crsId, mapNo, bbox = getPdfInformation(pdfFilePath)
+
+    # get the driver
+    srcDriver = ogr.GetDriverByName("PDF")
+
+    # opening the PDF
+    try:
+        pdf = srcDriver.Open(pdfFilePath, 0)
+    except Exception, e:
+        print e
+        return
 
     crsWkt = QgsCoordinateReferenceSystem(crsId).toWkt()
 
@@ -286,7 +299,7 @@ def importPdf(pdfFilePath):
             srcNpArray = np.array(srcList)
 
             # transform all vertex
-            tgtNpList = transform(srcNpArray)
+            tgtNpList = npTransform(srcNpArray)
 
             # move vertex
             for i in range(0, len(srcNpArray)):
@@ -303,12 +316,33 @@ def importPdf(pdfFilePath):
                 qgisFeature.setAttributes([fid])
                 vPolygonLayer.dataProvider().addFeatures([qgisFeature])
 
-    canvas.setExtent(QgsRectangle(tmBoxLL[0], tmBoxLL[1], tmBoxTR[0], tmBoxTR[1]))
-
     # clean close
     del pdf
+
+    return crsId, bbox
+
+
+def main():
+    # clear canvas
+    QgsMapLayerRegistry.instance().removeAllMapLayers()
+
+    crsId, bbox = importPdf(PDF_FILE_NAME)
+
+    # Project 좌표계로 변환하여 화면을 이동해야 한다.
+    canvas = iface.mapCanvas()
+    mapRenderer = canvas.mapRenderer()
+    srs = mapRenderer.destinationCrs()
+    mapProj = Proj(init="EPSG:{}".format(crsId))
+    projProj = Proj(init=srs.authid())
+    minPnt = transform(mapProj, projProj, bbox[0][0], bbox[0][1])
+    maxPnt = transform(mapProj, projProj, bbox[3][0], bbox[3][1])
+    canvas.setExtent(QgsRectangle(minPnt[0], minPnt[1], maxPnt[0], maxPnt[1]))
+    canvas.refresh()
 
     print("COMPLETED!")
 
 
-importPdf(PDF_FILE_NAME)
+###################
+# RUN Main function
+if __name__ == '__console__':
+    main()
