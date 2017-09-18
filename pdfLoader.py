@@ -7,12 +7,26 @@ import sys, os
 from osgeo import ogr, gdal
 from pyproj import Proj, transform
 
+from qgis.core import *
+
 # To avoid 'QVariant' is not defined error
 from PyQt4.QtCore import *
 
 import re
-from math import sqrt, floor
 import numpy as np
+import copy
+
+try:
+    import PyPDF2
+    from PyPDF2.filters import *
+except:
+    import pip
+    pip.main(['install', "PyPDF2"])
+    import PyPDF2
+    from PyPDF2.filters import *
+
+from PIL import Image
+from io import BytesIO
 
 ogr.UseExceptions()
 
@@ -20,7 +34,7 @@ ogr.UseExceptions()
 LAYER_FILTER = re.compile(u"^지도정보_")
 MAP_BOX_LAYER = u"지도정보_도곽"
 PDF_FILE_NAME = u"C:\\Temp\\(B090)온맵_37612058.pdf"
-
+NUM_FILTER = re.compile("_(\d)")
 
 def findConner(points):
     pntLL = pntLR = pntTL = pntTR = None
@@ -113,7 +127,7 @@ def mapNoToMapBox(mapNo):
 
 
 # REFER: https://stackoverflow.com/questions/20546182/how-to-perform-coordinates-affine-transformation-using-python-part-2
-def calcTranform(srcP1, srcP2, srcP3, srcP4, tgtP1, tgtP2, tgtP3, tgtP4):
+def calcAffineTranform(srcP1, srcP2, srcP3, srcP4, tgtP1, tgtP2, tgtP3, tgtP4):
     primary = np.array([[srcP1[0], srcP1[1]],
                         [srcP2[0], srcP2[1]],
                         [srcP3[0], srcP3[1]],
@@ -135,8 +149,8 @@ def calcTranform(srcP1, srcP2, srcP3, srcP4, tgtP1, tgtP2, tgtP3, tgtP4):
     # to find our transformation matrix A
     A, res, rank, s = np.linalg.lstsq(X, Y)
 
-    npTransform = lambda x: unpad(np.dot(pad(x), A))
-    return npTransform
+    affineTransform = lambda x: unpad(np.dot(pad(x), A))
+    return affineTransform
 
 
 def getPdfInformation(pdfFilePath):
@@ -190,8 +204,8 @@ def getPdfInformation(pdfFilePath):
         totalFeatureCnt = pdfLayer.GetFeatureCount()
         pointCount = 0
         lineCount = 0
-        curveCount = 0
         polygonCount = 0
+
         for feature in pdfLayer:
             geometry = feature.GetGeometryRef()
             geomType = geometry.GetGeometryType()
@@ -212,6 +226,8 @@ def getPdfInformation(pdfFilePath):
                         mapBoxPoints = geometry.GetPoints()
                         pntLL, pntLR, pntTL, pntTR = findConner(mapBoxPoints)
 
+        pdfLayer.ResetReading()
+
         if mapBoxLayerId:
             mapBoxLayerId = None
 
@@ -220,14 +236,14 @@ def getPdfInformation(pdfFilePath):
 
     print (pntLL, pntLR, pntTL, pntTR)
 
-    npTransform = calcTranform(pntLL, pntLR, pntTL, pntTR, tmBoxLL, tmBoxLR, tmBoxTL, tmBoxTR)
+    affineTranform = calcAffineTranform(pntLL, pntLR, pntTL, pntTR, tmBoxLL, tmBoxLR, tmBoxTL, tmBoxTR)
 
     del pdf
 
-    return  layerInfoList, npTransform, crsId, mapNo, (tmBoxLL, tmBoxLR, tmBoxTL, tmBoxTR)
+    return  layerInfoList, affineTranform, crsId, mapNo, (tmBoxLL, tmBoxLR, tmBoxTL, tmBoxTR)
 
 
-def importPdf(pdfFilePath):
+def importPdfVector(pdfFilePath):
     # PDF에서 레이어와 좌표계 변환 정보 추출
     layerInfoList, npTransform, crsId, mapNo, bbox = getPdfInformation(pdfFilePath)
 
@@ -275,8 +291,6 @@ def importPdf(pdfFilePath):
             QgsMapLayerRegistry.instance().addMapLayer(vPolygonLayer)
 
         pdfLayer = pdf.GetLayerByIndex(layerInfo["id"])
-        # 한번 읽은 레이어는 읽음 포인터를 시작점으로 돌려야 다시 읽을 수 있다.
-        pdfLayer.ResetReading()
         for ogrFeature in pdfLayer:
             geometry = ogrFeature.GetGeometryRef()
             geomType = geometry.GetGeometryType()
@@ -316,17 +330,151 @@ def importPdf(pdfFilePath):
                 qgisFeature.setAttributes([fid])
                 vPolygonLayer.dataProvider().addFeatures([qgisFeature])
 
+            # 한번 읽은 레이어는 읽음 포인터를 시작점으로 돌려야 다시 읽을 수 있다.
+            pdfLayer.ResetReading()
+
     # clean close
     del pdf
 
     return crsId, bbox
 
 
-def main():
-    # clear canvas
-    QgsMapLayerRegistry.instance().removeAllMapLayers()
+def importPdfRaster(pdfFilePath):
+    try:
+        pdfObj = PyPDF2.PdfFileReader(open(pdfFilePath, "rb"))
+    except RuntimeError, e:
+        return
 
-    crsId, bbox = importPdf(PDF_FILE_NAME)
+    pageObj = pdfObj.getPage(0)
+
+    print("artBox: " + str(pageObj.artBox))
+    print("cropBox: " + str(pageObj.cropBox))
+
+    try:
+        xObject = pageObj['/Resources']['/XObject'].getObject()
+    except KeyError:
+        return
+
+    images = {}
+
+    for obj in xObject:
+        if xObject[obj]['/Subtype'] == '/Image':
+            name = obj[1:]
+            m = re.search('.*_(\d*)', name)
+            try:
+                id = int(m.group(1))
+            except:
+                continue
+            size = (xObject[obj]['/Width'], xObject[obj]['/Height'])
+
+            colorSpace = xObject[obj]['/ColorSpace']
+            if colorSpace == '/DeviceRGB':
+                mode = "RGB"
+            elif colorSpace == '/DeviceCMYK':
+                mode = "CMYK"
+            elif colorSpace[0] == "/Indexed":
+                mode = "P"
+                colorSpace, base, hival, lookup = [v.getObject() for v in colorSpace]
+                palette = lookup.getData()
+            elif colorSpace[0] == "/ICCBased":
+                mode = "P"
+                lookup = colorSpace[1].getObject()
+                palette = lookup.getData()
+            else:
+                continue
+
+            try:
+                stream = xObject[obj]
+                data = stream._data
+                filters = stream.get("/Filter", ())
+                if type(filters) is not PyPDF2.generic.ArrayObject:
+                    filters = [filters]
+                leftFilters = copy.deepcopy(filters)
+
+                if data:
+                    for filterType in filters:
+                        if filterType == "/FlateDecode" or filterType == "/Fl":
+                            data = FlateDecode.decode(data, stream.get("/DecodeParms"))
+                            leftFilters.remove(filterType)
+                        elif filterType == "/ASCIIHexDecode" or filterType == "/AHx":
+                            data = ASCIIHexDecode.decode(data)
+                            leftFilters.remove(filterType)
+                        elif filterType == "/LZWDecode" or filterType == "/LZW":
+                            data = LZWDecode.decode(data, stream.get("/DecodeParms"))
+                            leftFilters.remove(filterType)
+                        elif filterType == "/ASCII85Decode" or filterType == "/A85":
+                            data = ASCII85Decode.decode(data)
+                            leftFilters.remove(filterType)
+                        elif filterType == "/Crypt":
+                            decodeParams = stream.get("/DecodeParams", {})
+                            if "/Name" not in decodeParams and "/Type" not in decodeParams:
+                                pass
+                            else:
+                                raise NotImplementedError("/Crypt filter with /Name or /Type not supported yet")
+                            leftFilters.remove(filterType)
+
+                    # case of Flat image
+                    if len(leftFilters) == 0:
+                        img = Image.frombytes(mode, size, data)
+                        if mode == "P":
+                            img.putpalette(palette)
+                        if mode == "CMYK":
+                            img = img.convert('RGB')
+                        images[id] = img
+
+                    # case of JPEG
+                    elif len(leftFilters) == 1 and leftFilters[0] == '/DCTDecode':
+                        jpgData = BytesIO(data)
+                        img = Image.open(jpgData)
+                        if mode == "CMYK":
+                            imgData = np.frombuffer(img.tobytes(), dtype='B')
+                            invData = np.full(imgData.shape, 255, dtype='B')
+                            invData -= imgData
+                            img = Image.frombytes(img.mode, img.size, invData.tobytes())
+                        images[id] = img
+            except:
+                pass
+
+    keys = images.keys()
+    keys.sort()
+
+    mergedWidth = None
+    mergedHeight = None
+    mergedMode = None
+    for key in keys:
+        image = images[key]
+        width, height = image.size
+        if not mergedWidth:
+            mergedWidth, mergedHeight = width, height
+            mergedMode = image.mode
+            continue
+
+        if width != mergedWidth:
+            break
+
+        mergedHeight += height
+
+    mergedImage = Image.new("RGB", (mergedWidth, mergedHeight))
+    crrY = mergedHeight
+    for key in keys:
+        image = images[key]
+        crrY -= image.height
+        mergedImage.paste(image, (0, crrY))
+
+    mergedImage.save("/temp/mergedImage.tif")
+
+    return
+
+
+def main():
+    importPdfRaster(PDF_FILE_NAME)
+    return
+
+    # clear canvas
+    # QgsMapLayerRegistry.instance().removeAllMapLayers()
+
+    crsId, bbox = importPdfVector(PDF_FILE_NAME)
+
 
     # Project 좌표계로 변환하여 화면을 이동해야 한다.
     canvas = iface.mapCanvas()
@@ -345,4 +493,7 @@ def main():
 ###################
 # RUN Main function
 if __name__ == '__console__':
+    main()
+
+if __name__ == '__main__':
     main()
