@@ -4,7 +4,7 @@
 import sys, os
 
 # import OGR
-from osgeo import ogr, gdal
+from osgeo import ogr, gdal, osr
 from pyproj import Proj, transform
 
 from qgis.core import *
@@ -15,6 +15,7 @@ from PyQt4.QtCore import *
 import re
 import numpy as np
 import copy
+import struct
 
 try:
     import PyPDF2
@@ -33,8 +34,9 @@ ogr.UseExceptions()
 # 기본 설정값
 LAYER_FILTER = re.compile(u"^지도정보_")
 MAP_BOX_LAYER = u"지도정보_도곽"
+MAP_CLIP_LAYER = u"지도정보_Other"
 PDF_FILE_NAME = u"C:\\Temp\\(B090)온맵_37612058.pdf"
-NUM_FILTER = re.compile("_(\d)")
+NUM_FILTER = re.compile('.*_(\d*)')
 
 def findConner(points):
     pntLL = pntLR = pntTL = pntTR = None
@@ -58,16 +60,16 @@ def findConner(points):
         tmpDistTL = (point[0]-xMin)**2 + (point[1]-yMin)**2
         tmpDistTR = (point[0]-xMax)**2 + (point[1]-yMin)**2
 
-        if not distLL or distLL > tmpDistLL:
+        if distLL is None or distLL > tmpDistLL:
             distLL = tmpDistLL
             pntLL = point
-        if not distLR or distLR > tmpDistLR:
+        if distLR is None or distLR > tmpDistLR:
             distLR = tmpDistLR
             pntLR = point
-        if not distTL or distTL > tmpDistTL:
+        if distTL is None or distTL > tmpDistTL:
             distTL = tmpDistTL
             pntTL = point
-        if not distTR or distTR > tmpDistTR:
+        if distTR is None or distTR > tmpDistTR:
             distTR = tmpDistTR
             pntTR = point
 
@@ -150,7 +152,8 @@ def calcAffineTranform(srcP1, srcP2, srcP3, srcP4, tgtP1, tgtP2, tgtP3, tgtP4):
     A, res, rank, s = np.linalg.lstsq(X, Y)
 
     affineTransform = lambda x: unpad(np.dot(pad(x), A))
-    return affineTransform
+    print(A)
+    return affineTransform, A.T
 
 
 def getPdfInformation(pdfFilePath):
@@ -166,7 +169,7 @@ def getPdfInformation(pdfFilePath):
 
     mapNo = os.path.splitext(findMapNo(os.path.basename(pdfFilePath)))[0]
     boxLL, boxLR, boxTL, boxTR = mapNoToMapBox(mapNo)
-    print(boxLL, boxLR, boxTL, boxTR)
+    # print(boxLL, boxLR, boxTL, boxTR)
 
     # 좌표계 판단
     if boxLL[0] < 126.0:
@@ -184,7 +187,7 @@ def getPdfInformation(pdfFilePath):
     tmBoxTL = p(boxTL[0], boxTL[1])
     tmBoxTR = p(boxTR[0], boxTR[1])
 
-    print(tmBoxLL, tmBoxLR, tmBoxTL, tmBoxTR)
+    # print(tmBoxLL, tmBoxLR, tmBoxTL, tmBoxTR)
 
     # use OGR specific exceptions
     # list to store layers'names
@@ -193,14 +196,17 @@ def getPdfInformation(pdfFilePath):
     # parsing layers by index
     # 레이어 ID, 레이어 이름, 객체 수, 지오매트리 유형
     mapBoxLayerId = None
+    mapClipLayerId = None
     mapBoxGeometry = None
-    mapBoxPoints = None
-    pntLL = pntLR = pntTL = pntTR = None
+    mapClipGeometry = None
+    boxLL = boxLR = boxTL = boxTR = None
     for iLayer in range(pdf.GetLayerCount()):
         pdfLayer = pdf.GetLayerByIndex(iLayer)
         name = unicode(pdfLayer.GetName().decode('utf-8'))
         if name == MAP_BOX_LAYER:
             mapBoxLayerId = iLayer
+        if name == MAP_CLIP_LAYER:
+            mapClipLayerId = iLayer
         totalFeatureCnt = pdfLayer.GetFeatureCount()
         pointCount = 0
         lineCount = 0
@@ -219,12 +225,20 @@ def getPdfInformation(pdfFilePath):
                 print(u"[Unknown Type] " + ogr.GeometryTypeToName(geomType))
 
             # 도곽을 찾아 정보 추출
-            if mapBoxLayerId and not mapBoxGeometry:
+            if mapBoxLayerId and mapBoxGeometry is None:
                 if geometry.GetPointCount() == 5:
                     if geometry.GetX(0) == geometry.GetX(4) and geometry.GetY(0) == geometry.GetY(4):
                         mapBoxGeometry = geometry
                         mapBoxPoints = geometry.GetPoints()
-                        pntLL, pntLR, pntTL, pntTR = findConner(mapBoxPoints)
+                        boxLL, boxLR, boxTL, boxTR = findConner(mapBoxPoints)
+
+            # 영상영역 찾아 정보 추출
+            if mapClipLayerId and mapClipGeometry is None:
+                if geometry.GetPointCount() == 5:
+                    if geometry.GetX(0) == geometry.GetX(4) and geometry.GetY(0) == geometry.GetY(4):
+                        mapClipGeometry = geometry
+                        mapClipPoints = geometry.GetPoints()
+                        imgLL, imgLR, imgTL, imgTR = findConner(mapClipPoints)
 
         pdfLayer.ResetReading()
 
@@ -234,19 +248,23 @@ def getPdfInformation(pdfFilePath):
         layerInfoList.append({'id': iLayer, 'name': name, "totalCount": totalFeatureCnt,
                               "pointCount": pointCount, "lineCount": lineCount, "polygonCount": polygonCount})
 
-    print (pntLL, pntLR, pntTL, pntTR)
+    # print (boxLL, boxLR, boxTL, boxTR)
 
-    affineTranform = calcAffineTranform(pntLL, pntLR, pntTL, pntTR, tmBoxLL, tmBoxLR, tmBoxTL, tmBoxTR)
+    affineTransform, _ = calcAffineTranform(boxLL, boxLR, boxTL, boxTR, tmBoxLL, tmBoxLR, tmBoxTL, tmBoxTR)
+
+    srcList = [[imgLL[0],imgLL[1]], [imgLR[0],imgLR[1]], [imgTL[0], imgTL[1]], [imgTR[0], imgTR[1]]]
+    srcNpArray = np.array(srcList, dtype=np.float32)
+    tgtNpArray = affineTransform(srcNpArray)
+
+    print(srcNpArray)
+    print(tgtNpArray)
 
     del pdf
 
-    return  layerInfoList, affineTranform, crsId, mapNo, (tmBoxLL, tmBoxLR, tmBoxTL, tmBoxTR)
+    return  layerInfoList, affineTransform, crsId, mapNo, (tmBoxLL, tmBoxLR, tmBoxTL, tmBoxTR), (tgtNpArray[0], tgtNpArray[1], tgtNpArray[2], tgtNpArray[3])
 
 
-def importPdfVector(pdfFilePath):
-    # PDF에서 레이어와 좌표계 변환 정보 추출
-    layerInfoList, npTransform, crsId, mapNo, bbox = getPdfInformation(pdfFilePath)
-
+def importPdfVector(pdfFilePath, layerInfoList, affineTransform, crsId, mapNo, bbox):
     # get the driver
     srcDriver = ogr.GetDriverByName("PDF")
 
@@ -313,7 +331,7 @@ def importPdfVector(pdfFilePath):
             srcNpArray = np.array(srcList)
 
             # transform all vertex
-            tgtNpList = npTransform(srcNpArray)
+            tgtNpList = affineTransform(srcNpArray)
 
             # move vertex
             for i in range(0, len(srcNpArray)):
@@ -339,7 +357,7 @@ def importPdfVector(pdfFilePath):
     return crsId, bbox
 
 
-def importPdfRaster(pdfFilePath):
+def importPdfRaster(pdfFilePath, crsId, affineTransform, imgBox):
     try:
         pdfObj = PyPDF2.PdfFileReader(open(pdfFilePath, "rb"))
     except RuntimeError, e:
@@ -347,8 +365,7 @@ def importPdfRaster(pdfFilePath):
 
     pageObj = pdfObj.getPage(0)
 
-    print("artBox: " + str(pageObj.artBox))
-    print("cropBox: " + str(pageObj.cropBox))
+    artBox = pageObj.artBox
 
     try:
         xObject = pageObj['/Resources']['/XObject'].getObject()
@@ -360,7 +377,7 @@ def importPdfRaster(pdfFilePath):
     for obj in xObject:
         if xObject[obj]['/Subtype'] == '/Image':
             name = obj[1:]
-            m = re.search('.*_(\d*)', name)
+            m = NUM_FILTER.search(name)
             try:
                 id = int(m.group(1))
             except:
@@ -435,6 +452,9 @@ def importPdfRaster(pdfFilePath):
             except:
                 pass
 
+    del pdfObj
+
+    # 이미지를 ID 순으로 연결
     keys = images.keys()
     keys.sort()
 
@@ -444,7 +464,7 @@ def importPdfRaster(pdfFilePath):
     for key in keys:
         image = images[key]
         width, height = image.size
-        if not mergedWidth:
+        if mergedWidth is None:
             mergedWidth, mergedHeight = width, height
             mergedMode = image.mode
             continue
@@ -455,25 +475,74 @@ def importPdfRaster(pdfFilePath):
         mergedHeight += height
 
     mergedImage = Image.new("RGB", (mergedWidth, mergedHeight))
-    crrY = mergedHeight
+    crrY = 0
     for key in keys:
-        image = images[key]
-        crrY -= image.height
+        image = images[key].transpose(Image.FLIP_TOP_BOTTOM)
         mergedImage.paste(image, (0, crrY))
+        crrY += image.height
+        del image
 
     mergedImage.save("/temp/mergedImage.tif")
+    del mergedImage
+
+    # 좌표계 정보 생성
+    crs = osr.SpatialReference()
+    crs.ImportFromEPSG(crsId)
+    crs_wkt = crs.ExportToWkt()
+
+    # 매트릭스 계산
+    srcList = [
+        [0, mergedHeight],
+        [mergedWidth, mergedHeight],
+        [0, 0],
+        [mergedWidth, 0]
+    ]
+    srcNpArray = np.array(srcList, dtype=np.float32)
+    srcList = [
+        [0, mergedHeight],
+        [mergedWidth, mergedHeight],
+        [0, 0],
+        [mergedWidth, 0]
+    ]
+    srcNpArray = np.array(srcList, dtype=np.float32)
+
+    # print(srcNpArray)
+    # print(imgBox)
+
+    _, matrix = calcAffineTranform(
+        srcNpArray[0], srcNpArray[1], srcNpArray[2], srcNpArray[3],
+        imgBox[0], imgBox[1], imgBox[2], imgBox[3]
+    )
+    # print(matrix)
+
+    # GeoTIFF 만들기
+    outImage = gdal.Open("/temp/mergedImage.tif")
+    driver = gdal.GetDriverByName('GTiff')
+    gtiff = driver.CreateCopy("/temp/mergedImage2.tif", outImage)
+    gtiff.SetProjection(crs_wkt)
+
+    # P1(C): x_origin,
+    # P2(A): cos(rotation) * x_pixel_size,
+    # P3(D): -sin(rotation) * x_pixel_size,
+    # P4(F): y_origin,
+    # P5(B): sin(rotation) * y_pixel_size,
+    # P6(E): cos(rotation) * y_pixel_size)
+    gtiff.SetGeoTransform((matrix[0][2], matrix[0][0], matrix[1][0], matrix[1][2], matrix[0][1], matrix[1][1]))
 
     return
 
 
 def main():
-    importPdfRaster(PDF_FILE_NAME)
-    return
 
     # clear canvas
     # QgsMapLayerRegistry.instance().removeAllMapLayers()
 
-    crsId, bbox = importPdfVector(PDF_FILE_NAME)
+    # PDF에서 레이어와 좌표계 변환 정보 추출
+    layerInfoList, affineTransform, crsId, mapNo, bbox, imgBox = getPdfInformation(PDF_FILE_NAME)
+
+    importPdfRaster(PDF_FILE_NAME, crsId, affineTransform, imgBox)
+    return
+    crsId, bbox = importPdfVector(PDF_FILE_NAME, layerInfoList, affineTransform, crsId, mapNo, bbox)
 
 
     # Project 좌표계로 변환하여 화면을 이동해야 한다.
