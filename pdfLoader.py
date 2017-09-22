@@ -258,23 +258,11 @@ def getPdfInformation(pdfFilePath):
     srcNpArray = np.array(srcList, dtype=np.float32)
     tgtNpArray = affineTransform(srcNpArray)
 
-    del pdf
-
-    return  layerInfoList, affineTransform, crsId, mapNo, (tmBoxLL, tmBoxLR, tmBoxTL, tmBoxTR), (tgtNpArray[0], tgtNpArray[1], tgtNpArray[2], tgtNpArray[3])
+    return  pdf, layerInfoList, affineTransform, crsId, mapNo, (tmBoxLL, tmBoxLR, tmBoxTL, tmBoxTR), (tgtNpArray[0], tgtNpArray[1], tgtNpArray[2], tgtNpArray[3])
 
 
-def importPdfVector(pdfFilePath, layerInfoList, affineTransform, crsId, mapNo, bbox):
+def importPdfVector(pdf, layerInfoList, affineTransform, crsId, mapNo, bbox):
     prvTime = calcTime()
-
-    # get the driver
-    srcDriver = ogr.GetDriverByName("PDF")
-
-    # opening the PDF
-    try:
-        pdf = srcDriver.Open(pdfFilePath, 0)
-    except Exception, e:
-        print e
-        return
 
     print ("START importPdfVector")
 
@@ -296,25 +284,25 @@ def importPdfVector(pdfFilePath, layerInfoList, affineTransform, crsId, mapNo, b
         if not LAYER_FILTER.match(layerInfo["name"]) :
             continue
 
-        # # Geometry Type 별 레이어 생성
-        # if layerInfo["pointCount"] > 0:
-        #     layerName = u"{}_Point".format(layerInfo["name"])
-        #     vPointLayer = QgsVectorLayer("Point?crs={}".format(crsWkt), layerName, "memory")
-        #     vPointLayer.dataProvider().addAttributes([QgsField("GID",  QVariant.Int)])
-        #     vPointLayer.updateFields()
-        #     QgsMapLayerRegistry.instance().addMapLayer(vPointLayer)
-        # if layerInfo["lineCount"] > 0:
-        #     layerName = u"{}_Line".format(layerInfo["name"])
-        #     vLineLayer = QgsVectorLayer("LineString?crs={}".format(crsWkt), layerName, "memory")
-        #     vLineLayer.dataProvider().addAttributes([QgsField("GID", QVariant.Int)])
-        #     vLineLayer.updateFields()
-        #     QgsMapLayerRegistry.instance().addMapLayer(vLineLayer)
-        # if layerInfo["polygonCount"] > 0:
-        #     layerName = u"{}_Polygon".format(layerInfo["name"])
-        #     vPolygonLayer = QgsVectorLayer("Polygon?crs={}".format(crsWkt), layerName, "memory")
-        #     vPolygonLayer.dataProvider().addAttributes([QgsField("GID", QVariant.Int)])
-        #     vPolygonLayer.updateFields()
-        #     QgsMapLayerRegistry.instance().addMapLayer(vPolygonLayer)
+        # Geometry Type 별 레이어 생성
+        if layerInfo["pointCount"] > 0:
+            layerName = u"{}_Point".format(layerInfo["name"])
+            vPointLayer = QgsVectorLayer("Point?crs={}".format(crsWkt), layerName, "memory")
+            vPointLayer.dataProvider().addAttributes([QgsField("GID",  QVariant.Int)])
+            vPointLayer.updateFields()
+            QgsMapLayerRegistry.instance().addMapLayer(vPointLayer)
+        if layerInfo["lineCount"] > 0:
+            layerName = u"{}_Line".format(layerInfo["name"])
+            vLineLayer = QgsVectorLayer("LineString?crs={}".format(crsWkt), layerName, "memory")
+            vLineLayer.dataProvider().addAttributes([QgsField("GID", QVariant.Int)])
+            vLineLayer.updateFields()
+            QgsMapLayerRegistry.instance().addMapLayer(vLineLayer)
+        if layerInfo["polygonCount"] > 0:
+            layerName = u"{}_Polygon".format(layerInfo["name"])
+            vPolygonLayer = QgsVectorLayer("Polygon?crs={}".format(crsWkt), layerName, "memory")
+            vPolygonLayer.dataProvider().addAttributes([QgsField("GID", QVariant.Int)])
+            vPolygonLayer.updateFields()
+            QgsMapLayerRegistry.instance().addMapLayer(vPolygonLayer)
 
         pdfLayer = pdf.GetLayerByIndex(layerInfo["id"])
         for ogrFeature in pdfLayer:
@@ -323,47 +311,41 @@ def importPdfVector(pdfFilePath, layerInfoList, affineTransform, crsId, mapNo, b
             geomWkb = geometry.ExportToWkb()
             fid = ogrFeature.GetFID()
 
-            # qgisFeature = QgsFeature()
-            # qgisGeom = QgsGeometry()
-            # qgisGeom.fromWkb(geomWkb)
-            #
-            # # collect vertex
-            # i = 0
-            # vertex = qgisGeom.vertexAt(i)
-            # srcList = []
-            # while (vertex != QgsPoint(0, 0)):
-            #     srcList.append([vertex.x(), vertex.y()])
-            #     i += 1
-            #     vertex = qgisGeom.vertexAt(i)
-            #
-            # srcNpArray = np.array(srcList)
-            #
-            # # transform all vertex
-            # tgtNpList = affineTransform(srcNpArray)
-            #
-            # # move vertex
-            # for i in range(0, len(srcNpArray)):
-            #     qgisGeom.moveVertex(tgtNpList[i,0], tgtNpList[i,1], i)
-            #
-            # qgisFeature.setGeometry(qgisGeom)
-            # if geomType == ogr.wkbPoint or geomType == ogr.wkbMultiPoint:
-            #     qgisFeature.setAttributes([fid])
-            #     vPointLayer.dataProvider().addFeatures([qgisFeature])
-            # elif geomType == ogr.wkbLineString or geomType == ogr.wkbMultiLineString:
-            #     qgisFeature.setAttributes([fid])
-            #     vLineLayer.dataProvider().addFeatures([qgisFeature])
-            # elif geomType == ogr.wkbPolygon or geomType == ogr.wkbMultiPolygon:
-            #     qgisFeature.setAttributes([fid])
-            #     vPolygonLayer.dataProvider().addFeatures([qgisFeature])
+            qgisFeature = QgsFeature()
+            qgisGeom = QgsGeometry()
+            qgisGeom.fromWkb(geomWkb)
 
-            # 한번 읽은 레이어는 읽음 포인터를 시작점으로 돌려야 다시 읽을 수 있다.
-            pdfLayer.ResetReading()
+            # collect vertex
+            i = 0
+            vertex = qgisGeom.vertexAt(i)
+            srcList = []
+            while (vertex != QgsPoint(0, 0)):
+                srcList.append([vertex.x(), vertex.y()])
+                i += 1
+                vertex = qgisGeom.vertexAt(i)
+
+            srcNpArray = np.array(srcList)
+
+            # transform all vertex
+            tgtNpList = affineTransform(srcNpArray)
+
+            # move vertex
+            for i in range(0, len(srcNpArray)):
+                qgisGeom.moveVertex(tgtNpList[i,0], tgtNpList[i,1], i)
+
+            qgisFeature.setGeometry(qgisGeom)
+            if geomType == ogr.wkbPoint or geomType == ogr.wkbMultiPoint:
+                qgisFeature.setAttributes([fid])
+                vPointLayer.dataProvider().addFeatures([qgisFeature])
+            elif geomType == ogr.wkbLineString or geomType == ogr.wkbMultiLineString:
+                qgisFeature.setAttributes([fid])
+                vLineLayer.dataProvider().addFeatures([qgisFeature])
+            elif geomType == ogr.wkbPolygon or geomType == ogr.wkbMultiPolygon:
+                qgisFeature.setAttributes([fid])
+                vPolygonLayer.dataProvider().addFeatures([qgisFeature])
 
         print u"Layer: {} - ".format(layerInfo["name"]),
         prvTime = calcTime(prvTime)
-
-    # clean close
-    del pdf
 
     return crsId, bbox
 
@@ -371,9 +353,8 @@ def importPdfVector(pdfFilePath, layerInfoList, affineTransform, crsId, mapNo, b
 def importPdfRaster(pdfFilePath, crsId, affineTransform, imgBox):
 
     root, ext = os.path.splitext(pdfFilePath)
-    outputFilePath = os.path.join(root, ".txt")
+    outputFilePath = root + ".tif"
     _, tempFilePath = tempfile.mkstemp(".tif")
-    _.close()
 
     try:
         pdfObj = PyPDF2.PdfFileReader(open(pdfFilePath, "rb"))
@@ -543,7 +524,12 @@ def importPdfRaster(pdfFilePath, crsId, affineTransform, imgBox):
     gtiff.SetGeoTransform((matrix[0][2], matrix[0][0], matrix[1][0], matrix[1][2], matrix[0][1], matrix[1][1]))
 
     del gtiff
-    raster = QgsRasterLayer(outputFilePath)
+
+    # iface.addRasterLayer(outputFilePath, u"영상")
+    root = QgsProject.instance().layerTreeRoot()
+    rasterLayer = QgsRasterLayer(outputFilePath, u"영상")
+    QgsMapLayerRegistry.instance().addMapLayer(rasterLayer, False)
+    root.addLayer(rasterLayer)
 
     return outputFilePath
 
@@ -561,25 +547,30 @@ def calcTime(prvTime = None):
 def main():
 
     # clear canvas
-    # QgsMapLayerRegistry.instance().removeAllMapLayers()
+    QgsMapLayerRegistry.instance().removeAllMapLayers()
 
     print("START")
     prvTime = calcTime()
 
     # PDF에서 레이어와 좌표계 변환 정보 추출
-    layerInfoList, affineTransform, crsId, mapNo, bbox, imgBox = getPdfInformation(PDF_FILE_NAME)
-
+    pdf, layerInfoList, affineTransform, crsId, mapNo, bbox, imgBox = getPdfInformation(PDF_FILE_NAME)
+    # TODO: 읽지 못한 상황에 대한 대비
     print "getPdfInformation: ",
     prvTime = calcTime(prvTime)
 
-    crsId, bbox = importPdfVector(PDF_FILE_NAME, layerInfoList, affineTransform, crsId, mapNo, bbox)
+    crsId, bbox = importPdfVector(pdf, layerInfoList, affineTransform, crsId, mapNo, bbox)
+    print "importPdfVector: ",
+    prvTime = calcTime(prvTime)
 
-    # TEST
-    return
+    # clean close
+    del pdf
 
     imgFile = importPdfRaster(PDF_FILE_NAME, crsId, affineTransform, imgBox)
+    print "importPdfRaster: ",
+    prvTime = calcTime(prvTime)
 
     # Project 좌표계로 변환하여 화면을 이동해야 한다.
+    # TODO: 벡터 레이어가 없는 경우 여기서 오류나는 것 수정
     canvas = iface.mapCanvas()
     mapRenderer = canvas.mapRenderer()
     srs = mapRenderer.destinationCrs()
