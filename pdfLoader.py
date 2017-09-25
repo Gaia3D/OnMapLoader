@@ -11,6 +11,7 @@ from qgis.core import *
 
 # To avoid 'QVariant' is not defined error
 from PyQt4.QtCore import *
+from PyQt4.QtGui import QFileDialog
 
 import re
 import numpy as np
@@ -37,7 +38,10 @@ ogr.UseExceptions()
 LAYER_FILTER = re.compile(u"^지도정보_")
 MAP_BOX_LAYER = u"지도정보_도곽"
 MAP_CLIP_LAYER = u"지도정보_Other"
-PDF_FILE_NAME = u"C:\\Temp\\(B090)온맵_37612058.pdf"
+# PDF_FILE_NAME = u"C:\\Temp\\(B090)온맵_37612058.pdf"
+# PDF_FILE_NAME = u"C:\\Temp\\(B090)온맵_376124.pdf"
+# PDF_FILE_NAME = u"C:\\Temp\\(B090)온맵_37612.pdf"
+PDF_FILE_NAME = u"C:\\Temp\\(B090)온맵_NJ52-7.pdf"
 NUM_FILTER = re.compile('.*_(\d*)')
 
 def findConner(points):
@@ -91,36 +95,81 @@ def mapNoToMapBox(mapNo):
     if not isinstance(mapNo, basestring):
         return None
 
-    if len(mapNo) == 5:
+    if mapNo[:2].upper() == "NJ" or mapNo[:2].upper() == "NI":
+        scale = 250000
+    elif len(mapNo) == 5:
         scale = 50000
+    elif len(mapNo) == 6:
+        scale = 25000
     elif len(mapNo) == 8:
         scale = 5000
     else:
         return None
 
-    try:
-        iLat = int(mapNo[0:2])
-        iLon = int(mapNo[2:3]) + 120
-        index50k = int(mapNo[3:5])
-        rowIndex50k = (index50k-1)/4
-        colIndex50k = (index50k-1)%4
-        if scale == 5000:
-            index5k = int(mapNo[5:])
-            rowIndex5k = (index5k - 1) / 10
-            colIndex5k = (index5k - 1) % 10
-    except:
-        return None
+    if scale == 250000:
+        try:
+            keyLat = mapNo[:2]
+            keyLon = mapNo[2:5]
+            subIndex = int(mapNo[5:])
 
-    minLon = float(iLon) + colIndex50k*0.25
-    maxLat = float(iLat) + (1-rowIndex50k*0.25)
-    if scale == 50000:
-        maxLon = minLon + 0.25
-        minLat = maxLat - 0.25
-    else: #5000
-        minLon += colIndex5k * 0.025
-        maxLat -= rowIndex5k * 0.025
-        maxLon = minLon + 0.025
-        minLat = maxLat - 0.025
+            if keyLat == "NJ":
+                maxLat = 39.0
+            elif keyLat == "NI":
+                maxLat = 36.0
+            else:
+                return
+
+            if keyLon == "52-":
+                minLon = 126.0
+            elif keyLon == "51-":
+                minLon = 120.0
+            else:
+                return
+
+            rowIndex = (subIndex - 1) / 3
+            colIndex = (subIndex - 1) % 3
+
+            minLon += colIndex * 2.0
+            maxLat -= rowIndex * 1.0
+            maxLon = minLon + 0.125
+            minLat = maxLat - 0.125
+
+        except:
+            return
+
+    else:
+        try:
+            iLat = int(mapNo[0:2])
+            iLon = int(mapNo[2:3]) + 120
+            index50k = int(mapNo[3:5])
+            rowIndex50k = (index50k-1)/4
+            colIndex50k = (index50k-1)%4
+            if scale == 25000:
+                index25k = int(mapNo[5:])
+                rowIndex25k = (index25k - 1) / 2
+                colIndex25k = (index25k - 1) % 2
+            elif scale == 5000:
+                index5k = int(mapNo[5:])
+                rowIndex5k = (index5k - 1) / 10
+                colIndex5k = (index5k - 1) % 10
+        except:
+            return None
+
+        minLon = float(iLon) + colIndex50k*0.25
+        maxLat = float(iLat) + (1-rowIndex50k*0.25)
+        if scale == 50000:
+            maxLon = minLon + 0.25
+            minLat = maxLat - 0.25
+        elif scale == 25000:
+            minLon += colIndex25k * 0.125
+            maxLat -= rowIndex25k * 0.125
+            maxLon = minLon + 0.125
+            minLat = maxLat - 0.125
+        else: #5000
+            minLon += colIndex5k * 0.025
+            maxLat -= rowIndex5k * 0.025
+            maxLon = minLon + 0.025
+            minLat = maxLat - 0.025
 
     pntLL = (minLon, minLat)
     pntLR = (maxLon, minLat)
@@ -158,19 +207,29 @@ def calcAffineTranform(srcP1, srcP2, srcP3, srcP4, tgtP1, tgtP2, tgtP3, tgtP4):
 
 
 def getPdfInformation(pdfFilePath):
+    message(u"PDF 파일에서 정보추출 시작...")
+    mapNo = os.path.splitext(findMapNo(os.path.basename(pdfFilePath)))[0]
+    if mapNo is None:
+        return
+
+    try:
+        boxLL, boxLR, boxTL, boxTR = mapNoToMapBox(mapNo)
+    except:
+        message(u"해석할 수 없는 도엽명이어서 중단됩니다.")
+        return
+
     # get the driver
     srcDriver = ogr.GetDriverByName("PDF")
 
     # opening the PDF
+    crr = calcTime()
+    print "PDF Open: ",
     try:
         pdf = srcDriver.Open(pdfFilePath, 0)
     except Exception, e:
         print e
         return
-
-    mapNo = os.path.splitext(findMapNo(os.path.basename(pdfFilePath)))[0]
-    boxLL, boxLR, boxTL, boxTR = mapNoToMapBox(mapNo)
-    # print(boxLL, boxLR, boxTL, boxTR)
+    crr = calcTime(crr)
 
     # 좌표계 판단
     if boxLL[0] < 126.0:
@@ -204,10 +263,11 @@ def getPdfInformation(pdfFilePath):
     for iLayer in range(pdf.GetLayerCount()):
         pdfLayer = pdf.GetLayerByIndex(iLayer)
         name = unicode(pdfLayer.GetName().decode('utf-8'))
+        print(name)
 
-        if name == MAP_BOX_LAYER:
+        if name.find(MAP_BOX_LAYER) >= 0:
             mapBoxLayerId = iLayer
-        if name == MAP_CLIP_LAYER:
+        if name.find(MAP_CLIP_LAYER) >= 0:
             mapClipLayerId = iLayer
         totalFeatureCnt = pdfLayer.GetFeatureCount()
         pointCount = 0
@@ -228,19 +288,21 @@ def getPdfInformation(pdfFilePath):
 
             # 도곽을 찾아 정보 추출
             if mapBoxLayerId and mapBoxGeometry is None:
-                if geometry.GetPointCount() == 5:
-                    if geometry.GetX(0) == geometry.GetX(4) and geometry.GetY(0) == geometry.GetY(4):
-                        mapBoxGeometry = geometry
-                        mapBoxPoints = geometry.GetPoints()
-                        boxLL, boxLR, boxTL, boxTR = findConner(mapBoxPoints)
+                if geometry.GetPointCount() > 0 \
+                        and geometry.GetX(0) == geometry.GetX(geometry.GetPointCount()-1) \
+                        and geometry.GetY(0) == geometry.GetY(geometry.GetPointCount()-1):
+                    mapBoxGeometry = geometry
+                    mapBoxPoints = geometry.GetPoints()
+                    boxLL, boxLR, boxTL, boxTR = findConner(mapBoxPoints)
 
             # 영상영역 찾아 정보 추출
             if mapClipLayerId and mapClipGeometry is None:
-                if geometry.GetPointCount() == 5:
-                    if geometry.GetX(0) == geometry.GetX(4) and geometry.GetY(0) == geometry.GetY(4):
-                        mapClipGeometry = geometry
-                        mapClipPoints = geometry.GetPoints()
-                        imgLL, imgLR, imgTL, imgTR = findConner(mapClipPoints)
+                if geometry.GetPointCount() > 0 \
+                        and geometry.GetX(0) == geometry.GetX(geometry.GetPointCount()-1) \
+                        and geometry.GetY(0) == geometry.GetY(geometry.GetPointCount()-1):
+                    mapClipGeometry = geometry
+                    mapClipPoints = geometry.GetPoints()
+                    imgLL, imgLR, imgTL, imgTR = findConner(mapClipPoints)
 
         pdfLayer.ResetReading()
 
@@ -250,7 +312,7 @@ def getPdfInformation(pdfFilePath):
         layerInfoList.append({'id': iLayer, 'name': name, "totalCount": totalFeatureCnt,
                               "pointCount": pointCount, "lineCount": lineCount, "polygonCount": polygonCount})
 
-    # print (boxLL, boxLR, boxTL, boxTR)
+    print (boxLL, boxLR, boxTL, boxTR)
 
     affineTransform, _ = calcAffineTranform(boxLL, boxLR, boxTL, boxTR, tmBoxLL, tmBoxLR, tmBoxTL, tmBoxTR)
 
@@ -544,17 +606,34 @@ def calcTime(prvTime = None):
     return crr
 
 
+def message(str):
+    print(str)
+
 def main():
 
+    # pdgFilePath = QFileDialog.getOpenFileName(caption=u"국토지리정보원 온맵 PDF 파일 선택", filter=u"온맵(*.pdf)")
+
+    pdgFilePath = PDF_FILE_NAME
+
+    if pdgFilePath is None:
+        return
+
     # clear canvas
-    QgsMapLayerRegistry.instance().removeAllMapLayers()
+    try:
+        QgsMapLayerRegistry.instance().removeAllMapLayers()
+    except:
+        pass
 
     print("START")
     prvTime = calcTime()
 
     # PDF에서 레이어와 좌표계 변환 정보 추출
-    pdf, layerInfoList, affineTransform, crsId, mapNo, bbox, imgBox = getPdfInformation(PDF_FILE_NAME)
-    # TODO: 읽지 못한 상황에 대한 대비
+    try:
+        pdf, layerInfoList, affineTransform, crsId, mapNo, bbox, imgBox = getPdfInformation(pdgFilePath)
+    except TypeError:
+        message(u"PDF 파일에서 정보를 추출하지 못했습니다. 온맵 PDF가 아닌 듯 합니다.")
+        return
+
     print "getPdfInformation: ",
     prvTime = calcTime(prvTime)
 
@@ -565,21 +644,23 @@ def main():
     # clean close
     del pdf
 
-    imgFile = importPdfRaster(PDF_FILE_NAME, crsId, affineTransform, imgBox)
+    imgFile = importPdfRaster(pdgFilePath, crsId, affineTransform, imgBox)
     print "importPdfRaster: ",
     prvTime = calcTime(prvTime)
 
     # Project 좌표계로 변환하여 화면을 이동해야 한다.
-    # TODO: 벡터 레이어가 없는 경우 여기서 오류나는 것 수정
-    canvas = iface.mapCanvas()
-    mapRenderer = canvas.mapRenderer()
-    srs = mapRenderer.destinationCrs()
-    mapProj = Proj(init="EPSG:{}".format(crsId))
-    projProj = Proj(init=srs.authid())
-    minPnt = transform(mapProj, projProj, bbox[0][0], bbox[0][1])
-    maxPnt = transform(mapProj, projProj, bbox[3][0], bbox[3][1])
-    canvas.setExtent(QgsRectangle(minPnt[0], minPnt[1], maxPnt[0], maxPnt[1]))
-    canvas.refresh()
+    try:
+        canvas = iface.mapCanvas()
+        mapRenderer = canvas.mapRenderer()
+        srs = mapRenderer.destinationCrs()
+        mapProj = Proj(init="EPSG:{}".format(crsId))
+        projProj = Proj(init=srs.authid())
+        minPnt = transform(mapProj, projProj, bbox[0][0], bbox[0][1])
+        maxPnt = transform(mapProj, projProj, bbox[3][0], bbox[3][1])
+        canvas.setExtent(QgsRectangle(minPnt[0], minPnt[1], maxPnt[0], maxPnt[1]))
+        canvas.refresh()
+    except:
+        pass
 
     print("COMPLETED!")
 
