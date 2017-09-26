@@ -40,9 +40,10 @@ MAP_BOX_LAYER = u"지도정보_도곽"
 MAP_CLIP_LAYER = u"지도정보_Other"
 # PDF_FILE_NAME = u"C:\\Temp\\(B090)온맵_37612058.pdf"
 # PDF_FILE_NAME = u"C:\\Temp\\(B090)온맵_376124.pdf"
-# PDF_FILE_NAME = u"C:\\Temp\\(B090)온맵_37612.pdf"
-PDF_FILE_NAME = u"C:\\Temp\\(B090)온맵_NJ52-7.pdf"
+PDF_FILE_NAME = u"C:\\Temp\\(B090)온맵_37612.pdf"
+# PDF_FILE_NAME = u"C:\\Temp\\(B090)온맵_NJ52-7.pdf"
 NUM_FILTER = re.compile('.*_(\d*)')
+SKIP_IMAGE_WIDTH = 2000
 
 def findConner(points):
     pntLL = pntLR = pntTL = pntTR = None
@@ -107,6 +108,9 @@ def mapNoToMapBox(mapNo):
         return None
 
     if scale == 250000:
+        message(u"죄송합니다.25만 도엽은 지원되지 않습니다.")
+        return
+
         try:
             keyLat = mapNo[:2]
             keyLon = mapNo[2:5]
@@ -444,11 +448,17 @@ def importPdfRaster(pdfFilePath, crsId, affineTransform, imgBox):
                 continue
             size = (xObject[obj]['/Width'], xObject[obj]['/Height'])
 
+            # 작은 이미지 무시
+            if size[0] < SKIP_IMAGE_WIDTH:
+                continue
+
             colorSpace = xObject[obj]['/ColorSpace']
             if colorSpace == '/DeviceRGB':
                 mode = "RGB"
             elif colorSpace == '/DeviceCMYK':
                 mode = "CMYK"
+            elif colorSpace == '/DeviceGray':
+                mode = "L"
             elif colorSpace[0] == "/Indexed":
                 mode = "P"
                 colorSpace, base, hival, lookup = [v.getObject() for v in colorSpace]
@@ -489,6 +499,8 @@ def importPdfRaster(pdfFilePath, crsId, affineTransform, imgBox):
                             else:
                                 raise NotImplementedError("/Crypt filter with /Name or /Type not supported yet")
                             leftFilters.remove(filterType)
+                        elif filterType == ():
+                            leftFilters.remove(filterType)
 
                     # case of Flat image
                     if len(leftFilters) == 0:
@@ -524,6 +536,7 @@ def importPdfRaster(pdfFilePath, crsId, affineTransform, imgBox):
     for key in keys:
         image = images[key]
         width, height = image.size
+
         if mergedWidth is None:
             mergedWidth, mergedHeight = width, height
             mergedMode = image.mode
@@ -637,9 +650,9 @@ def main():
     print "getPdfInformation: ",
     prvTime = calcTime(prvTime)
 
-    crsId, bbox = importPdfVector(pdf, layerInfoList, affineTransform, crsId, mapNo, bbox)
-    print "importPdfVector: ",
-    prvTime = calcTime(prvTime)
+    # crsId, bbox = importPdfVector(pdf, layerInfoList, affineTransform, crsId, mapNo, bbox)
+    # print "importPdfVector: ",
+    # prvTime = calcTime(prvTime)
 
     # clean close
     del pdf
