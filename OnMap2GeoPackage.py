@@ -19,15 +19,18 @@ import copy
 import struct
 import tempfile
 import timeit
+import math
 
 try:
     import PyPDF2
     from PyPDF2.filters import *
+    from PyPDF2.pdf import *
 except:
     import pip
     pip.main(['install', "PyPDF2"])
     import PyPDF2
     from PyPDF2.filters import *
+    from PyPDF2.pdf import *
 
 from PIL import Image
 from io import BytesIO
@@ -210,6 +213,18 @@ def calcAffineTranform(srcP1, srcP2, srcP3, srcP4, tgtP1, tgtP2, tgtP3, tgtP4):
     return affineTransform, A.T
 
 
+def getPdfInformation_test(pdfFilePath):
+    pdf = PyPDF2.PdfFileReader(pdfFilePath, 'rb')
+    page = pdf.getPage(0)
+    content = page["/Contents"].getObject()
+    if not isinstance(content, ContentStream):
+        content = ContentStream(content, pdf)
+    for operands, operator in content.operations:
+        print operator
+        if operator != "BDC":
+            continue
+
+
 def getPdfInformation(pdfFilePath):
     message(u"PDF 파일에서 정보추출 시작...")
     mapNo = os.path.splitext(findMapNo(os.path.basename(pdfFilePath)))[0]
@@ -338,8 +353,6 @@ def importPdfVector(pdf, gpkg, layerInfoList, affineTransform, crsId, mapNo, bbo
 
     # Create QGIS Layer
     for layerInfo in layerInfoList:
-        print(layerInfo["name"])
-
         newLayer = None
         vLineLayer = None
         vPolygonLayer = None
@@ -352,17 +365,17 @@ def importPdfVector(pdf, gpkg, layerInfoList, affineTransform, crsId, mapNo, bbo
         # Geometry Type 별 레이어 생성
         if layerInfo["pointCount"] > 0:
             layerName = u"{}_Point".format(layerInfo["name"])
-            newLayer = gpkg.CreateLayer(layerName.encode('utf-8'), crsInfo, geom_type=ogr.wkbMultiPoint)
+            newLayer = gpkg.CreateLayer(layerName.encode('utf-8'), crs, geom_type=ogr.wkbMultiPoint)
             field = ogr.FieldDefn("GID", ogr.OFTInteger)
             newLayer.CreateField(field)
         if layerInfo["lineCount"] > 0:
             layerName = u"{}_Line".format(layerInfo["name"])
-            newLayer = gpkg.CreateLayer(layerName.encode('utf-8'), crsInfo, geom_type=ogr.wkbMultiLineString)
+            newLayer = gpkg.CreateLayer(layerName.encode('utf-8'), crs, geom_type=ogr.wkbMultiLineString)
             field = ogr.FieldDefn("GID", ogr.OFTInteger)
             newLayer.CreateField(field)
         if layerInfo["polygonCount"] > 0:
             layerName = u"{}_Polygon".format(layerInfo["name"])
-            newLayer = gpkg.CreateLayer(layerName.encode('utf-8'), crsInfo, geom_type=ogr.wkbMultiPolygon)
+            newLayer = gpkg.CreateLayer(layerName.encode('utf-8'), crs, geom_type=ogr.wkbMultiPolygon)
             field = ogr.FieldDefn("GID", ogr.OFTInteger)
             newLayer.CreateField(field)
 
@@ -411,7 +424,7 @@ def importPdfVector(pdf, gpkg, layerInfoList, affineTransform, crsId, mapNo, bbo
     return
 
 
-def importPdfRaster(pdfFilePath, crsId, affineTransform, imgBox):
+def importPdfRaster(pdfFilePath, gpkgFileNale, crsId, affineTransform, imgBox):
 
     root, ext = os.path.splitext(pdfFilePath)
     outputFilePath = root + ".tif"
@@ -550,9 +563,6 @@ def importPdfRaster(pdfFilePath, crsId, affineTransform, imgBox):
         crrY += image.height
         del image
 
-    mergedImage.save(tempFilePath)
-    del mergedImage
-
     # 좌표계 정보 생성
     crs = osr.SpatialReference()
     crs.ImportFromEPSG(crsId)
@@ -566,42 +576,40 @@ def importPdfRaster(pdfFilePath, crsId, affineTransform, imgBox):
         [mergedWidth, 0]
     ]
     srcNpArray = np.array(srcList, dtype=np.float32)
-    srcList = [
-        [0, mergedHeight],
-        [mergedWidth, mergedHeight],
-        [0, 0],
-        [mergedWidth, 0]
-    ]
-    srcNpArray = np.array(srcList, dtype=np.float32)
 
     _, matrix = calcAffineTranform(
         srcNpArray[0], srcNpArray[1], srcNpArray[2], srcNpArray[3],
         imgBox[0], imgBox[1], imgBox[2], imgBox[3]
     )
 
-    # GeoTIFF 만들기
-    outImage = gdal.Open(tempFilePath)
-    driver = gdal.GetDriverByName('GTiff')
-    gtiff = driver.CreateCopy(outputFilePath, outImage)
-    gtiff.SetProjection(crs_wkt)
+    driver = gdal.GetDriverByName("GPKG")
+    dataset = driver.Create(
+        # "/temp/test.gpkg",
+        gpkgFileNale,
+        mergedWidth,
+        mergedHeight,
+        3,
+        gdal.GDT_Byte,
+        options=["APPEND_SUBDATASET=YES", "RASTER_TABLE=PHOTO_IMAGE", "TILE_FORMAT=JPEG"]
+    )
 
-    # P1(C): x_origin,
-    # P2(A): cos(rotation) * x_pixel_size,
-    # P3(D): -sin(rotation) * x_pixel_size,
-    # P4(F): y_origin,
-    # P5(B): sin(rotation) * y_pixel_size,
-    # P6(E): cos(rotation) * y_pixel_size)
-    gtiff.SetGeoTransform((matrix[0][2], matrix[0][0], matrix[1][0], matrix[1][2], matrix[0][1], matrix[1][1]))
+    dataset.SetProjection(crs_wkt)
+    xScale = math.sqrt(matrix[0][0] ** 2 + matrix[1][0] ** 2)
+    yScale = math.sqrt(matrix[0][1] ** 2 + matrix[1][1] ** 2)
+    dataset.SetGeoTransform((matrix[0][2], xScale, 0.0, matrix[1][2], 0.0, -yScale))
 
-    del gtiff
+    band1 = np.array(list(mergedImage.getdata(0))).reshape(-1, mergedWidth)
+    band2 = np.array(list(mergedImage.getdata(1))).reshape(-1, mergedWidth)
+    band3 = np.array(list(mergedImage.getdata(2))).reshape(-1, mergedWidth)
 
-    # iface.addRasterLayer(outputFilePath, u"영상")
-    root = QgsProject.instance().layerTreeRoot()
-    rasterLayer = QgsRasterLayer(outputFilePath, u"영상")
-    QgsMapLayerRegistry.instance().addMapLayer(rasterLayer, False)
-    root.addLayer(rasterLayer)
+    dataset.GetRasterBand(1).WriteArray(band1)
+    dataset.GetRasterBand(2).WriteArray(band2)
+    dataset.GetRasterBand(3).WriteArray(band3)
+    dataset.FlushCache()
 
-    return outputFilePath
+    del dataset
+
+    return
 
 
 def createGeoPackage(gpkgFilePath):
@@ -611,7 +619,8 @@ def createGeoPackage(gpkgFilePath):
         if os.path.isfile(gpkgFilePath):
             os.remove(gpkgFilePath)
     except Exception, e:
-        print e
+        message(u"{} 파일을 다시 만들 수 없습니다. 아마 사용중인 듯 합니다.".format(gpkgFilePath))
+        return
 
     driver = ogr.GetDriverByName("GPKG")
     # opening the FileGDB
@@ -621,7 +630,6 @@ def createGeoPackage(gpkgFilePath):
             gpkg = driver.CreateDataSource(gpkgFilePath)
     except Exception, e:
         print e
-
 
     return gpkg
 
@@ -654,6 +662,10 @@ def main():
     base, ext = os.path.splitext(pdgFilePath)
     gpkgFilePath = base + ".gpkg"
 
+    gpkg = createGeoPackage(gpkgFilePath)
+    if gpkg is None:
+        return
+
     # clear canvas
     try:
         QgsMapLayerRegistry.instance().removeAllMapLayers()
@@ -666,6 +678,7 @@ def main():
     # PDF에서 레이어와 좌표계 변환 정보 추출
     try:
         pdf, layerInfoList, affineTransform, crsId, mapNo, bbox, imgBox = getPdfInformation(pdgFilePath)
+        # pdf, layerInfoList, affineTransform, crsId, mapNo, bbox, imgBox = getPdfInformation_test(pdgFilePath)
     except TypeError:
         message(u"PDF 파일에서 정보를 추출하지 못했습니다. 온맵 PDF가 아닌 듯 합니다.")
         return
@@ -673,18 +686,14 @@ def main():
     print "getPdfInformation: ",
     prvTime = calcTime(prvTime)
 
-    gpkg = createGeoPackage(gpkgFilePath)
-
     importPdfVector(pdf, gpkg, layerInfoList, affineTransform, crsId, mapNo, bbox)
     print "importPdfVector: ",
     prvTime = calcTime(prvTime)
 
-    return
-
     # clean close
     del pdf
 
-    imgFile = importPdfRaster(pdgFilePath, crsId, affineTransform, imgBox)
+    imgFile = importPdfRaster(pdgFilePath, gpkgFilePath, crsId, affineTransform, imgBox)
     print "importPdfRaster: ",
     prvTime = calcTime(prvTime)
 
