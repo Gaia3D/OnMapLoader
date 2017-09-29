@@ -45,6 +45,7 @@ PDF_FILE_NAME = u"C:\\Temp\\(B090)온맵_37612058.pdf"
 NUM_FILTER = re.compile('.*_(\d*)')
 SKIP_IMAGE_WIDTH = 2000
 
+
 def findConner(points):
     pntLL = pntLR = pntTL = pntTR = None
 
@@ -345,7 +346,6 @@ def importPdfVector(pdf, layerInfoList, affineTransform, crsId, mapNo, bbox):
         vLineLayer = None
         vPolygonLayer = None
 
-        # TODO: 사용자로 부터 옵션 받게 수정
         # 지도정보_ 로 시작하는 레이어만 임포트
         if not LAYER_FILTER.match(layerInfo["name"]) :
             continue
@@ -650,9 +650,9 @@ def main():
     print "getPdfInformation: ",
     prvTime = calcTime(prvTime)
 
-    # crsId, bbox = importPdfVector(pdf, layerInfoList, affineTransform, crsId, mapNo, bbox)
-    # print "importPdfVector: ",
-    # prvTime = calcTime(prvTime)
+    crsId, bbox = importPdfVector(pdf, layerInfoList, affineTransform, crsId, mapNo, bbox)
+    print "importPdfVector: ",
+    prvTime = calcTime(prvTime)
 
     # clean close
     del pdf

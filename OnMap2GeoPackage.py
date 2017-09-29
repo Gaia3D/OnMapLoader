@@ -346,6 +346,7 @@ def importPdfVector(pdf, gpkg, layerInfoList, affineTransform, crsId, mapNo, bbo
     prvTime = calcTime()
 
     print ("START importPdfVector")
+    createdLayerName = []
 
     # 좌표계 정보 생성
     crs = osr.SpatialReference()
@@ -353,7 +354,7 @@ def importPdfVector(pdf, gpkg, layerInfoList, affineTransform, crsId, mapNo, bbo
 
     # Create QGIS Layer
     for layerInfo in layerInfoList:
-        newLayer = None
+        vPointLayer = None
         vLineLayer = None
         vPolygonLayer = None
 
@@ -362,37 +363,47 @@ def importPdfVector(pdf, gpkg, layerInfoList, affineTransform, crsId, mapNo, bbo
         if not LAYER_FILTER.match(layerInfo["name"]) :
             continue
 
-        # Geometry Type 별 레이어 생성
-        if layerInfo["pointCount"] > 0:
-            layerName = u"{}_Point".format(layerInfo["name"])
-            newLayer = gpkg.CreateLayer(layerName.encode('utf-8'), crs, geom_type=ogr.wkbMultiPoint)
-            field = ogr.FieldDefn("GID", ogr.OFTInteger)
-            newLayer.CreateField(field)
-        if layerInfo["lineCount"] > 0:
-            layerName = u"{}_Line".format(layerInfo["name"])
-            newLayer = gpkg.CreateLayer(layerName.encode('utf-8'), crs, geom_type=ogr.wkbMultiLineString)
-            field = ogr.FieldDefn("GID", ogr.OFTInteger)
-            newLayer.CreateField(field)
-        if layerInfo["polygonCount"] > 0:
-            layerName = u"{}_Polygon".format(layerInfo["name"])
-            newLayer = gpkg.CreateLayer(layerName.encode('utf-8'), crs, geom_type=ogr.wkbMultiPolygon)
-            field = ogr.FieldDefn("GID", ogr.OFTInteger)
-            newLayer.CreateField(field)
-
         pdfLayer = pdf.GetLayerByIndex(layerInfo["id"])
         for ogrFeature in pdfLayer:
             geometry = ogrFeature.GetGeometryRef()
             fid = ogrFeature.GetFID()
+            geomType = geometry.GetGeometryType()
 
-            featureDefn = newLayer.GetLayerDefn()
+            if geomType == ogr.wkbPoint or geomType == ogr.wkbMultiPoint:
+                if not vPointLayer:
+                    layerName = u"{}_Point".format(layerInfo["name"])
+                    vPointLayer = gpkg.CreateLayer(layerName.encode('utf-8'), crs, geom_type=ogr.wkbMultiPoint)
+                    field = ogr.FieldDefn("GID", ogr.OFTInteger)
+                    vPointLayer.CreateField(field)
+                    createdLayerName.append(layerName)
+                vLayer = vPointLayer
+            elif geomType == ogr.wkbLineString or geomType == ogr.wkbMultiLineString:
+                if not vLineLayer:
+                    layerName = u"{}_Line".format(layerInfo["name"])
+                    vLineLayer = gpkg.CreateLayer(layerName.encode('utf-8'), crs, geom_type=ogr.wkbMultiLineString)
+                    field = ogr.FieldDefn("GID", ogr.OFTInteger)
+                    vLineLayer.CreateField(field)
+                    createdLayerName.append(layerName)
+                vLayer = vLineLayer
+            elif geomType == ogr.wkbPolygon or geomType == ogr.wkbMultiPolygon:
+                if not vPolygonLayer:
+                    layerName = u"{}_Polygon".format(layerInfo["name"])
+                    vPolygonLayer = gpkg.CreateLayer(layerName.encode('utf-8'), crs, geom_type=ogr.wkbMultiPolygon)
+                    field = ogr.FieldDefn("GID", ogr.OFTInteger)
+                    vPolygonLayer.CreateField(field)
+                    createdLayerName.append(layerName)
+                vLayer = vPolygonLayer
+            else:
+                print ("[ERROR] Unknown geometry type: " + geometry.GetGeometryName())
+                continue
+
+            featureDefn = vLayer.GetLayerDefn()
             feature = ogr.Feature(featureDefn)
             feature.SetField("GID", fid)
 
             # collect vertex
             if geometry.GetGeometryCount() <= 0:
                 pointList = geometry.GetPoints()
-
-                # srcNpArray = np.array(srcList, dtype=np.float32)
                 srcNpArray = np.array(pointList, dtype=np.float32)
 
                 # transform all vertex
@@ -415,16 +426,16 @@ def importPdfVector(pdf, gpkg, layerInfoList, affineTransform, crsId, mapNo, bbo
                         geom.SetPoint(i, tgtNpList[i][0], tgtNpList[i][1])
 
             feature.SetGeometry(geometry)
-            newLayer.CreateFeature(feature)
+            vLayer.CreateFeature(feature)
             feature = None
 
         print u"Layer: {} - ".format(layerInfo["name"]),
         prvTime = calcTime(prvTime)
 
-    return
+    return createdLayerName
 
 
-def importPdfRaster(pdfFilePath, gpkgFileNale, crsId, affineTransform, imgBox):
+def importPdfRaster(pdfFilePath, gpkgFileNale, crsId, imgBox):
 
     root, ext = os.path.splitext(pdfFilePath)
     outputFilePath = root + ".tif"
@@ -609,7 +620,7 @@ def importPdfRaster(pdfFilePath, gpkgFileNale, crsId, affineTransform, imgBox):
 
     del dataset
 
-    return
+    return True
 
 
 def createGeoPackage(gpkgFilePath):
@@ -648,18 +659,18 @@ def message(str):
     print(str)
 
 def main():
-    try:
-        iface
-        pdgFilePath = QFileDialog.getOpenFileName(caption=u"국토지리정보원 온맵 PDF 파일 선택", filter=u"온맵(*.pdf)")
-    except:
-        pdgFilePath = PDF_FILE_NAME
+    # try:
+    #     iface
+    #     pdfFilePath = QFileDialog.getOpenFileName(caption=u"국토지리정보원 온맵 PDF 파일 선택", filter=u"온맵(*.pdf)")
+    # except:
+    #     pdfFilePath = PDF_FILE_NAME
+    pdfFilePath = PDF_FILE_NAME
 
-    if pdgFilePath is None:
+    if pdfFilePath is None:
         return
 
     # GeoPackage 파일 경로를 PDF와 같은 경로로 정한다.
-    # QgsApplication.qgisSettingsDirPath()
-    base, ext = os.path.splitext(pdgFilePath)
+    base, ext = os.path.splitext(pdfFilePath)
     gpkgFilePath = base + ".gpkg"
 
     gpkg = createGeoPackage(gpkgFilePath)
@@ -677,8 +688,8 @@ def main():
 
     # PDF에서 레이어와 좌표계 변환 정보 추출
     try:
-        pdf, layerInfoList, affineTransform, crsId, mapNo, bbox, imgBox = getPdfInformation(pdgFilePath)
-        # pdf, layerInfoList, affineTransform, crsId, mapNo, bbox, imgBox = getPdfInformation_test(pdgFilePath)
+        pdf, layerInfoList, affineTransform, crsId, mapNo, bbox, imgBox = getPdfInformation(pdfFilePath)
+        # pdf, layerInfoList, affineTransform, crsId, mapNo, bbox, imgBox = getPdfInformation_test(pdfFilePath)
     except TypeError:
         message(u"PDF 파일에서 정보를 추출하지 못했습니다. 온맵 PDF가 아닌 듯 합니다.")
         return
@@ -686,16 +697,35 @@ def main():
     print "getPdfInformation: ",
     prvTime = calcTime(prvTime)
 
-    importPdfVector(pdf, gpkg, layerInfoList, affineTransform, crsId, mapNo, bbox)
+    createdLayerName = importPdfVector(pdf, gpkg, layerInfoList, affineTransform, crsId, mapNo, bbox)
     print "importPdfVector: ",
     prvTime = calcTime(prvTime)
 
     # clean close
     del pdf
 
-    imgFile = importPdfRaster(pdgFilePath, gpkgFilePath, crsId, affineTransform, imgBox)
+    importPdfRaster(pdfFilePath, gpkgFilePath, crsId, imgBox)
     print "importPdfRaster: ",
     prvTime = calcTime(prvTime)
+
+    # 래스터 로딩
+    try:
+        layer = iface.addRasterLayer(gpkgFilePath, u"영상", "gdal")
+    except:
+        layer = None
+    if not layer:
+        print u"Layer {} failed to load!".format(u"영상")
+
+    # 벡터 로딩
+    for layerName in createdLayerName:
+        try:
+            uri = u"{}|layername={}".format(gpkgFilePath, layerName)
+            layer = iface.addVectorLayer(uri, None, "ogr")
+        except:
+            layer = None
+
+        if not layer:
+            print u"Layer {} failed to load!".format(layerName)
 
     # Project 좌표계로 변환하여 화면을 이동해야 한다.
     try:
