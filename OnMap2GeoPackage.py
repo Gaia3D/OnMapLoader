@@ -364,6 +364,9 @@ def importPdfVector(pdf, gpkg, layerInfoList, affineTransform, crsId, mapNo, bbo
             continue
 
         pdfLayer = pdf.GetLayerByIndex(layerInfo["id"])
+        if pdfLayer.GetLayerDefn().GetFieldCount() > 0:
+            print("FOUND ATTR!!!!")
+
         for ogrFeature in pdfLayer:
             geometry = ogrFeature.GetGeometryRef()
             fid = ogrFeature.GetFID()
@@ -645,6 +648,36 @@ def createGeoPackage(gpkgFilePath):
     return gpkg
 
 
+def openGeoPackage(gpkgFilePath):
+    # 래스터 로딩
+    try:
+        layer = iface.addRasterLayer(gpkgFilePath, u"영상", "gdal")
+    except:
+        layer = None
+    if not layer:
+        print u"Layer {} failed to load!".format(u"영상")
+
+    # 벡터 로딩
+    gpkg = None
+    try:
+        gpkg = ogr.Open(gpkgFilePath)
+
+        for layer in gpkg:
+            layerName = unicode(layer.GetName().decode('utf-8'))
+
+            try:
+                uri = u"{}|layername={}".format(gpkgFilePath, layerName)
+                layer = iface.addVectorLayer(uri, None, "ogr")
+            except:
+                layer = None
+
+            if not layer:
+                print u"Layer {} failed to load!".format(layerName)
+    finally:
+        if gpkg:
+            del gpkg
+
+
 def calcTime(prvTime = None):
     if prvTime is None:
         return timeit.default_timer()
@@ -708,24 +741,7 @@ def main():
     print "importPdfRaster: ",
     prvTime = calcTime(prvTime)
 
-    # 래스터 로딩
-    try:
-        layer = iface.addRasterLayer(gpkgFilePath, u"영상", "gdal")
-    except:
-        layer = None
-    if not layer:
-        print u"Layer {} failed to load!".format(u"영상")
-
-    # 벡터 로딩
-    for layerName in createdLayerName:
-        try:
-            uri = u"{}|layername={}".format(gpkgFilePath, layerName)
-            layer = iface.addVectorLayer(uri, None, "ogr")
-        except:
-            layer = None
-
-        if not layer:
-            print u"Layer {} failed to load!".format(layerName)
+    openGeoPackage(gpkgFilePath)
 
     # Project 좌표계로 변환하여 화면을 이동해야 한다.
     try:
