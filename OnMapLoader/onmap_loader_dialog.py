@@ -29,6 +29,10 @@ FORM_CLASS, _ = uic.loadUiType(os.path.join(
     os.path.dirname(__file__), 'onmap_loader_dialog_base.ui'))
 
 
+def force_gui_update():
+    QgsApplication.processEvents(QEventLoop.ExcludeUserInputEvents)
+
+
 class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
     def __init__(self, parent=None):
         """Constructor."""

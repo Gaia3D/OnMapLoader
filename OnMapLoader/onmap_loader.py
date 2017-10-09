@@ -22,11 +22,11 @@
 """
 from PyQt4.QtCore import QSettings, QTranslator, qVersion, QCoreApplication
 from PyQt4.QtGui import QAction, QIcon
-# Initialize Qt resources from file resources.py
-import resources
+
 # Import the code for the dialog
 from onmap_loader_dialog import OnMapLoaderDialog
 import os.path
+import webbrowser
 
 
 class OnMapLoader:
@@ -161,11 +161,18 @@ class OnMapLoader:
     def initGui(self):
         """Create the menu entries and toolbar icons inside the QGIS GUI."""
 
-        icon_path = ':/plugins/OnMapLoader/icon.png'
+        icon_path = os.path.dirname(__file__) + "/icon.png"
         self.add_action(
             icon_path,
-            text=self.tr(u'OnMap Loader'),
+            # text=self.tr('NGII 온맵(On-Map) 로더'),
+            text=u'NGII 온맵(On-Map) 로더',
             callback=self.run,
+            parent=self.iface.mainWindow())
+        icon_path = os.path.dirname(__file__) + "/help.png"
+        self.add_action(
+            icon_path,
+            text=self.tr('Help'),
+            callback=self.help,
             parent=self.iface.mainWindow())
 
 
@@ -191,3 +198,7 @@ class OnMapLoader:
             # Do something useful here - delete the line containing pass and
             # substitute with your code.
             pass
+
+
+    def help(self):
+        webbrowser.open_new(u'http://geeps.krihs.re.kr/?wiki=GeoCoding%20for%20Korea')

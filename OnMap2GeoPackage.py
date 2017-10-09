@@ -112,7 +112,7 @@ def mapNoToMapBox(mapNo):
 
     if scale == 250000:
         message(u"죄송합니다.25만 도엽은 지원되지 않습니다.")
-        return
+        return None
 
         try:
             keyLat = mapNo[:2]
@@ -124,14 +124,14 @@ def mapNoToMapBox(mapNo):
             elif keyLat == "NI":
                 maxLat = 36.0
             else:
-                return
+                return None
 
             if keyLon == "52-":
                 minLon = 126.0
             elif keyLon == "51-":
                 minLon = 120.0
             else:
-                return
+                return None
 
             rowIndex = (subIndex - 1) / 3
             colIndex = (subIndex - 1) % 3
@@ -142,7 +142,7 @@ def mapNoToMapBox(mapNo):
             minLat = maxLat - 0.125
 
         except:
-            return
+            return None
 
     else:
         try:
