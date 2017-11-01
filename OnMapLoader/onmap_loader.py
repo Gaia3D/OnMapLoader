@@ -22,6 +22,7 @@
 """
 from PyQt4.QtCore import QSettings, QTranslator, qVersion, QCoreApplication
 from PyQt4.QtGui import QAction, QIcon
+from PyQt4.QtGui import *
 
 # Import the code for the dialog
 from onmap_loader_dialog import OnMapLoaderDialog
@@ -66,6 +67,9 @@ class OnMapLoader:
         self.toolbar = self.iface.addToolBar(u'OnMapLoader')
         self.toolbar.setObjectName(u'OnMapLoader')
 
+        self._init_dialog()
+
+
     # noinspection PyMethodMayBeStatic
     def tr(self, message):
         """Get the translation for a string using Qt translation API.
@@ -80,7 +84,6 @@ class OnMapLoader:
         """
         # noinspection PyTypeChecker,PyArgumentList,PyCallByClass
         return QCoreApplication.translate('OnMapLoader', message)
-
 
     def add_action(
         self,
@@ -132,9 +135,6 @@ class OnMapLoader:
         :rtype: QAction
         """
 
-        # Create the dialog (after translation) and keep reference
-        self.dlg = OnMapLoaderDialog()
-
         icon = QIcon(icon_path)
         action = QAction(icon, text, parent)
         action.triggered.connect(callback)
@@ -175,7 +175,6 @@ class OnMapLoader:
             callback=self.help,
             parent=self.iface.mainWindow())
 
-
     def unload(self):
         """Removes the plugin menu item and icon from QGIS GUI."""
         for action in self.actions:
@@ -185,7 +184,6 @@ class OnMapLoader:
             self.iface.removeToolBarIcon(action)
         # remove the toolbar
         del self.toolbar
-
 
     def run(self):
         """Run method that performs all the real work"""
@@ -199,6 +197,11 @@ class OnMapLoader:
             # substitute with your code.
             pass
 
-
     def help(self):
         webbrowser.open_new(u'http://geeps.krihs.re.kr/?wiki=GeoCoding%20for%20Korea')
+        # QMessageBox.information(None, "", "TEST")
+
+    def _init_dialog(self):
+        # Create the dialog (after translation) and keep reference
+        self.dlg = OnMapLoaderDialog(self.iface, self.iface.mainWindow())
+

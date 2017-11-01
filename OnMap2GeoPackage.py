@@ -1,4 +1,4 @@
-#-*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 
 # standard imports
 import sys, os
@@ -27,6 +27,7 @@ try:
     from PyPDF2.pdf import *
 except:
     import pip
+
     pip.main(['install', "PyPDF2"])
     import PyPDF2
     from PyPDF2.filters import *
@@ -48,6 +49,7 @@ PDF_FILE_NAME = u"C:\\Temp\\(B090)온맵_37612058.pdf"
 NUM_FILTER = re.compile('.*_(\d*)')
 SKIP_IMAGE_WIDTH = 2000
 
+
 def findConner(points):
     pntLL = pntLR = pntTL = pntTR = None
 
@@ -65,10 +67,10 @@ def findConner(points):
     distTR = None
 
     for point in points:
-        tmpDistLL = (point[0]-xMin)**2 + (point[1]-yMax)**2
-        tmpDistLR = (point[0]-xMax)**2 + (point[1]-yMax)**2
-        tmpDistTL = (point[0]-xMin)**2 + (point[1]-yMin)**2
-        tmpDistTR = (point[0]-xMax)**2 + (point[1]-yMin)**2
+        tmpDistLL = (point[0] - xMin) ** 2 + (point[1] - yMax) ** 2
+        tmpDistLR = (point[0] - xMax) ** 2 + (point[1] - yMax) ** 2
+        tmpDistTL = (point[0] - xMin) ** 2 + (point[1] - yMin) ** 2
+        tmpDistTR = (point[0] - xMax) ** 2 + (point[1] - yMin) ** 2
 
         if distLL is None or distLL > tmpDistLL:
             distLL = tmpDistLL
@@ -90,7 +92,7 @@ def findMapNo(fileBase):
     MAP_NO_FILTER = re.compile(u".*온맵_(.*)$")
     res = MAP_NO_FILTER.search(fileBase)
     if res:
-        return res.group(1)
+        return os.path.splitext(res.group(1))[0]
     else:
         return None
 
@@ -149,8 +151,8 @@ def mapNoToMapBox(mapNo):
             iLat = int(mapNo[0:2])
             iLon = int(mapNo[2:3]) + 120
             index50k = int(mapNo[3:5])
-            rowIndex50k = (index50k-1)/4
-            colIndex50k = (index50k-1)%4
+            rowIndex50k = (index50k - 1) / 4
+            colIndex50k = (index50k - 1) % 4
             if scale == 25000:
                 index25k = int(mapNo[5:])
                 rowIndex25k = (index25k - 1) / 2
@@ -162,8 +164,8 @@ def mapNoToMapBox(mapNo):
         except:
             return None
 
-        minLon = float(iLon) + colIndex50k*0.25
-        maxLat = float(iLat) + (1-rowIndex50k*0.25)
+        minLon = float(iLon) + colIndex50k * 0.25
+        maxLat = float(iLat) + (1 - rowIndex50k * 0.25)
         if scale == 50000:
             maxLon = minLon + 0.25
             minLat = maxLat - 0.25
@@ -172,7 +174,7 @@ def mapNoToMapBox(mapNo):
             maxLat -= rowIndex25k * 0.125
             maxLon = minLon + 0.125
             minLat = maxLat - 0.125
-        else: #5000
+        else:  # 5000
             minLon += colIndex5k * 0.025
             maxLat -= rowIndex5k * 0.025
             maxLon = minLon + 0.025
@@ -194,14 +196,14 @@ def calcAffineTranform(srcP1, srcP2, srcP3, srcP4, tgtP1, tgtP2, tgtP3, tgtP4):
                         [srcP4[0], srcP4[1]]])
 
     secondary = np.array([[tgtP1[0], tgtP1[1]],
-                        [tgtP2[0], tgtP2[1]],
-                        [tgtP3[0], tgtP3[1]],
-                        [tgtP4[0], tgtP4[1]]])
+                          [tgtP2[0], tgtP2[1]],
+                          [tgtP3[0], tgtP3[1]],
+                          [tgtP4[0], tgtP4[1]]])
 
     # Pad the data with ones, so that our transformation can do translations too
     n = primary.shape[0]
     pad = lambda x: np.hstack([x, np.ones((x.shape[0], 1))])
-    unpad = lambda x: x[:,:-1]
+    unpad = lambda x: x[:, :-1]
     X = pad(primary)
     Y = pad(secondary)
 
@@ -214,7 +216,7 @@ def calcAffineTranform(srcP1, srcP2, srcP3, srcP4, tgtP1, tgtP2, tgtP3, tgtP4):
 
 
 def getPdfInformation_test(pdfFilePath):
-    pdf = PyPDF2.PdfFileReader(pdfFilePath, 'rb')
+    pdf = PyPDF2.PdfFileReader(pdfFilePath)
     page = pdf.getPage(0)
     content = page["/Contents"].getObject()
     if not isinstance(content, ContentStream):
@@ -227,7 +229,8 @@ def getPdfInformation_test(pdfFilePath):
 
 def getPdfInformation(pdfFilePath):
     message(u"PDF 파일에서 정보추출 시작...")
-    mapNo = os.path.splitext(findMapNo(os.path.basename(pdfFilePath)))[0]
+    # mapNo = os.path.splitext(findMapNo(os.path.basename(pdfFilePath)))[0]
+    mapNo = findMapNo(os.path.basename(pdfFilePath))
     if mapNo is None:
         return
 
@@ -308,8 +311,8 @@ def getPdfInformation(pdfFilePath):
             # 도곽을 찾아 정보 추출
             if mapBoxLayerId and mapBoxGeometry is None:
                 if geometry.GetPointCount() > 0 \
-                        and geometry.GetX(0) == geometry.GetX(geometry.GetPointCount()-1) \
-                        and geometry.GetY(0) == geometry.GetY(geometry.GetPointCount()-1):
+                        and geometry.GetX(0) == geometry.GetX(geometry.GetPointCount() - 1) \
+                        and geometry.GetY(0) == geometry.GetY(geometry.GetPointCount() - 1):
                     mapBoxGeometry = geometry
                     mapBoxPoints = geometry.GetPoints()
                     boxLL, boxLR, boxTL, boxTR = findConner(mapBoxPoints)
@@ -317,8 +320,8 @@ def getPdfInformation(pdfFilePath):
             # 영상영역 찾아 정보 추출
             if mapClipLayerId and mapClipGeometry is None:
                 if geometry.GetPointCount() > 0 \
-                        and geometry.GetX(0) == geometry.GetX(geometry.GetPointCount()-1) \
-                        and geometry.GetY(0) == geometry.GetY(geometry.GetPointCount()-1):
+                        and geometry.GetX(0) == geometry.GetX(geometry.GetPointCount() - 1) \
+                        and geometry.GetY(0) == geometry.GetY(geometry.GetPointCount() - 1):
                     mapClipGeometry = geometry
                     mapClipPoints = geometry.GetPoints()
                     imgLL, imgLR, imgTL, imgTR = findConner(mapClipPoints)
@@ -335,11 +338,12 @@ def getPdfInformation(pdfFilePath):
 
     affineTransform, _ = calcAffineTranform(boxLL, boxLR, boxTL, boxTR, tmBoxLL, tmBoxLR, tmBoxTL, tmBoxTR)
 
-    srcList = [[imgLL[0],imgLL[1]], [imgLR[0],imgLR[1]], [imgTL[0], imgTL[1]], [imgTR[0], imgTR[1]]]
+    srcList = [[imgLL[0], imgLL[1]], [imgLR[0], imgLR[1]], [imgTL[0], imgTL[1]], [imgTR[0], imgTR[1]]]
     srcNpArray = np.array(srcList, dtype=np.float32)
     tgtNpArray = affineTransform(srcNpArray)
 
-    return  pdf, layerInfoList, affineTransform, crsId, mapNo, (tmBoxLL, tmBoxLR, tmBoxTL, tmBoxTR), (tgtNpArray[0], tgtNpArray[1], tgtNpArray[2], tgtNpArray[3])
+    return pdf, layerInfoList, affineTransform, crsId, mapNo, (tmBoxLL, tmBoxLR, tmBoxTL, tmBoxTR), \
+           (tgtNpArray[0], tgtNpArray[1], tgtNpArray[2], tgtNpArray[3])
 
 
 def importPdfVector(pdf, gpkg, layerInfoList, affineTransform, crsId, mapNo, bbox):
@@ -360,7 +364,7 @@ def importPdfVector(pdf, gpkg, layerInfoList, affineTransform, crsId, mapNo, bbo
 
         # TODO: 사용자로 부터 옵션 받게 수정
         # 지도정보_ 로 시작하는 레이어만 임포트
-        if not LAYER_FILTER.match(layerInfo["name"]) :
+        if not LAYER_FILTER.match(layerInfo["name"]):
             continue
 
         pdfLayer = pdf.GetLayerByIndex(layerInfo["id"])
@@ -439,19 +443,13 @@ def importPdfVector(pdf, gpkg, layerInfoList, affineTransform, crsId, mapNo, bbo
 
 
 def importPdfRaster(pdfFilePath, gpkgFileNale, crsId, imgBox):
-
-    root, ext = os.path.splitext(pdfFilePath)
-    outputFilePath = root + ".tif"
-    _, tempFilePath = tempfile.mkstemp(".tif")
-
     try:
-        pdfObj = PyPDF2.PdfFileReader(open(pdfFilePath, "rb"))
+        fh = open(pdfFilePath, "rb")
+        pdfObj = PyPDF2.PdfFileReader(fh)
     except RuntimeError, e:
         return
 
     pageObj = pdfObj.getPage(0)
-
-    artBox = pageObj.artBox
 
     try:
         xObject = pageObj['/Resources']['/XObject'].getObject()
@@ -546,6 +544,7 @@ def importPdfRaster(pdfFilePath, gpkgFileNale, crsId, imgBox):
             except:
                 pass
 
+    fh.close()
     del pdfObj
 
     # 이미지를 ID 순으로 연결
@@ -576,6 +575,9 @@ def importPdfRaster(pdfFilePath, gpkgFileNale, crsId, imgBox):
         mergedImage.paste(image, (0, crrY))
         crrY += image.height
         del image
+        del images[key]
+
+    images.clear()
 
     # 좌표계 정보 생성
     crs = osr.SpatialReference()
@@ -598,7 +600,6 @@ def importPdfRaster(pdfFilePath, gpkgFileNale, crsId, imgBox):
 
     driver = gdal.GetDriverByName("GPKG")
     dataset = driver.Create(
-        # "/temp/test.gpkg",
         gpkgFileNale,
         mergedWidth,
         mergedHeight,
@@ -621,6 +622,11 @@ def importPdfRaster(pdfFilePath, gpkgFileNale, crsId, imgBox):
     dataset.GetRasterBand(3).WriteArray(band3)
     dataset.FlushCache()
 
+    mergedImage.close()
+    del mergedImage
+    del band1
+    del band2
+    del band3
     del dataset
 
     return True
@@ -674,22 +680,24 @@ def openGeoPackage(gpkgFilePath):
             if not layer:
                 print u"Layer {} failed to load!".format(layerName)
     finally:
-        if gpkg:
-            del gpkg
+        pass
+        # if gpkg:
+        #     del gpkg
 
 
-def calcTime(prvTime = None):
+def calcTime(prvTime=None):
     if prvTime is None:
         return timeit.default_timer()
 
     crr = timeit.default_timer()
-    print("{}ms".format(int((crr - prvTime)*1000)))
+    print("{}ms".format(int((crr - prvTime) * 1000)))
 
     return crr
 
 
 def message(str):
     print(str)
+
 
 def main():
     # try:
@@ -722,7 +730,6 @@ def main():
     # PDF에서 레이어와 좌표계 변환 정보 추출
     try:
         pdf, layerInfoList, affineTransform, crsId, mapNo, bbox, imgBox = getPdfInformation(pdfFilePath)
-        # pdf, layerInfoList, affineTransform, crsId, mapNo, bbox, imgBox = getPdfInformation_test(pdfFilePath)
     except TypeError:
         message(u"PDF 파일에서 정보를 추출하지 못했습니다. 온맵 PDF가 아닌 듯 합니다.")
         return
@@ -731,6 +738,8 @@ def main():
     prvTime = calcTime(prvTime)
 
     createdLayerName = importPdfVector(pdf, gpkg, layerInfoList, affineTransform, crsId, mapNo, bbox)
+    # del gpkg
+
     print "importPdfVector: ",
     prvTime = calcTime(prvTime)
 
