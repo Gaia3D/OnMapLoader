@@ -53,6 +53,14 @@ def force_gui_update():
     QgsApplication.processEvents(QEventLoop.ExcludeUserInputEvents)
 
 
+def addTreeItem(parent, text):
+    itm = QtGui.QTreeWidgetItem(parent)
+    itm.setText(0, text)
+    itm.setFlags(itm.flags() | Qt.ItemIsTristate | Qt.ItemIsUserCheckable)
+    itm.setCheckState(0, Qt.Checked)
+    return itm
+
+
 class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
     iface = None
     pdfPath = None
@@ -109,9 +117,9 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
         self.edtTgtFile.setText(self.gpkgPath)
 
         # Clear log window
-        QgsApplication.instance().setOverrideCursor(Qt.WaitCursor)
+        QgsApplication.setOverrideCursor(Qt.WaitCursor)
         self.editLog.clear()
-        QgsApplication.instance().restoreOverrideCursor()
+        QgsApplication.restoreOverrideCursor()
 
         # TODO: 이미 있는 gpkg 이용할지 물어보기
 
@@ -142,8 +150,39 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
             self.error(u"PDF 파일에서 정보를 추출하지 못했습니다. 온맵 PDF가 아닌 듯 합니다.")
             return
 
+        self.treeLayer.clear()
+        parentList = {}
+        parentList[0] = self.treeLayer
+        titleList = {}
+        titleList[0] = "ROOT"
         for layerInfo in layerInfoList:
-            self.info(layerInfo["name"])
+            name = layerInfo["name"]
+            if not LAYER_FILTER.match(name):
+                continue
+            nameList = name.split("_")
+            for i in range(len(nameList)):
+                title = nameList[i]
+                if not titleList.has_key(i+1):
+                    level = i+1
+                    titleList[level] = title
+                    item = addTreeItem(parentList[level-1], title)
+                    parentList[level] = item
+                    if level <= 2:
+                        item.setExpanded(True)
+                    else:
+                        item.setExpanded(False)
+                elif titleList[i+1] != title:
+                    level = i+1
+                    for j in range(level, len(titleList)):
+                        titleList.pop(j)
+                        parentList.pop(j)
+                    titleList[level] = title
+                    item = addTreeItem(parentList[level-1], title)
+                    parentList[level] = item
+                    if level <= 2:
+                        item.setExpanded(True)
+                    else:
+                        item.setExpanded(False)
 
     ########
     def findMapNo(self, fileBase):

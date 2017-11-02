@@ -208,7 +208,16 @@
       </widget>
      </item>
      <item>
-      <widget class="QTreeView" name="treeSelLayer"/>
+      <widget class="QTreeWidget" name="treeLayer">
+       <property name="headerHidden">
+        <bool>true</bool>
+       </property>
+       <column>
+        <property name="text">
+         <string notr="true">1</string>
+        </property>
+       </column>
+      </widget>
      </item>
     </layout>
    </item>
