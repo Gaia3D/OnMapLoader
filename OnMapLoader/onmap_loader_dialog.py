@@ -70,6 +70,20 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
         self.iface = iface
         self._connect_action()
 
+    def error(self, msg):
+        self.editLog.appendHtml(u'<font color="red">{}</font>'.format(msg))
+
+    def info(self, msg):
+        self.editLog.appendPlainText(msg)
+
+    def debug(self, msg):
+        self.editLog.appendHtml(u'<font color="gray">{}</font>'.format(msg))
+
+    def setCursor(self, cursor):
+        cursor = QCursor()
+        cursor.setShape(Qt.WhatsThisCursor)
+        QApplication.instance().setOverrideCursor(cursor)
+
     def _connect_action(self):
         self.connect(self.btnSrcFile, SIGNAL("clicked()"), self._on_click_btnSrcFile)
         self.connect(self.btnTgtFile, SIGNAL("clicked()"), self._on_click_btnTgtFile)
@@ -93,6 +107,11 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
         self.gpkgPath = base + ".gpkg"
 
         self.edtTgtFile.setText(self.gpkgPath)
+
+        # Clear log window
+        QgsApplication.instance().setOverrideCursor(Qt.WaitCursor)
+        self.editLog.clear()
+        QgsApplication.instance().restoreOverrideCursor()
 
         # TODO: 이미 있는 gpkg 이용할지 물어보기
 
@@ -120,14 +139,11 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
             pdf, layerInfoList, affineTransform, crsId, mapNo, bbox, imgBox \
                 = self.getPdfInformation(self.edtSrcFile.text())
         except TypeError:
-            self.log(u"PDF 파일에서 정보를 추출하지 못했습니다. 온맵 PDF가 아닌 듯 합니다.")
+            self.error(u"PDF 파일에서 정보를 추출하지 못했습니다. 온맵 PDF가 아닌 듯 합니다.")
             return
 
         for layerInfo in layerInfoList:
-            self.log(layerInfo["name"])
-
-    def log(self, msg):
-        self.listLog.addText(msg)
+            self.info(layerInfo["name"])
 
     ########
     def findMapNo(self, fileBase):
@@ -154,7 +170,7 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
             return None
 
         if scale == 250000:
-            self.log(u"죄송합니다.25만 도엽은 지원되지 않습니다.")
+            self.error(u"죄송합니다.25만 도엽은 지원되지 않습니다.")
             return None
 
             try:
@@ -295,7 +311,7 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
         self.lblMainWork.setText(u"선택한 온맵 파일 분석중...")
         self.progressMainWork.setMinimum(0)
         self.progressMainWork.setMaximum(0)
-        # self.log(u"PDF 파일에서 정보추출 시작...")
+        self.info(u"PDF 파일에서 정보추출 시작...")
         force_gui_update()
 
         mapNo = self.findMapNo(os.path.basename(pdfFilePath))
@@ -305,7 +321,7 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
         try:
             boxLL, boxLR, boxTL, boxTR = self.mapNoToMapBox(mapNo)
         except:
-            self.log(u"해석할 수 없는 도엽명이어서 중단됩니다.")
+            self.error(u"해석할 수 없는 도엽명이어서 중단됩니다.")
             return
 
         # get the driver
