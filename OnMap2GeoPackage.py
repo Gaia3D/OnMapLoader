@@ -8,6 +8,12 @@ from osgeo import ogr, gdal, osr
 from pyproj import Proj, transform
 
 from qgis.core import *
+try:
+    iface
+except:
+    import qgis.gui
+    iface = qgis.gui.QgisInterface
+
 
 # To avoid 'QVariant' is not defined error
 from PyQt4.QtCore import *
@@ -737,7 +743,7 @@ def main():
     print "getPdfInformation: ",
     prvTime = calcTime(prvTime)
 
-    createdLayerName = importPdfVector(pdf, gpkg, layerInfoList, affineTransform, crsId, mapNo, bbox)
+    importPdfVector(pdf, gpkg, layerInfoList, affineTransform, crsId, mapNo, bbox)
     # del gpkg
 
     print "importPdfVector: ",
