@@ -67,8 +67,6 @@ class OnMapLoader:
         self.toolbar = self.iface.addToolBar(u'OnMapLoader')
         self.toolbar.setObjectName(u'OnMapLoader')
 
-        self._init_dialog()
-
 
     # noinspection PyMethodMayBeStatic
     def tr(self, message):
@@ -188,6 +186,7 @@ class OnMapLoader:
     def run(self):
         """Run method that performs all the real work"""
         # show the dialog
+        self._init_dialog()
         self.dlg.show()
         # Run the dialog event loop
         result = self.dlg.exec_()

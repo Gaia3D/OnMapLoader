@@ -30,6 +30,7 @@ from qgis.core import *
 import re
 import numpy as np
 import copy
+import ConfigParser
 
 # import OGR
 from osgeo import ogr, gdal, osr
@@ -62,6 +63,43 @@ FORM_CLASS, _ = uic.loadUiType(os.path.join(
 
 
 #########################
+# ConfigParser Monkey Patch
+#########################
+# ConfigParser에 한글 문제가 있어 해결
+def write(self, fp):
+    """Write an .ini-format representation of the configuration state."""
+    if self._defaults:
+        fp.write("[%s]\n" % "DEFAULT")
+        for (key, value) in self._defaults.items():
+            fp.write("%s = %s\n" % (key, str(value).replace('\n', '\n\t')))
+        fp.write("\n")
+    for section in self._sections:
+        fp.write("[%s]\n" % section)
+        for (key, value) in self._sections[section].items():
+            if key == "__name__":
+                continue
+            if (value is not None) or (self._optcre == self.OPTCRE):
+                if type(value) == unicode:
+                    value = ''.join(value).encode('utf-8')
+                else:
+                    value = str(value)
+                value = value.replace('\n', '\n\t')
+                key = " = ".join((key, value))
+            fp.write("%s\n" % (key))
+        fp.write("\n")
+ConfigParser.RawConfigParser.write = write
+
+
+#########################
+# Define User Exception
+#########################
+class StoppedByUserException(Exception):
+    def __init__(self, message, errors):
+        # Call the base class constructor with the parameters it needs
+        super(StoppedByUserException, self).__init__(message)
+
+
+#########################
 # UI FUNCTION
 #########################
 def force_gui_update():
@@ -69,11 +107,11 @@ def force_gui_update():
 
 
 def addTreeItem(parent, text):
-    itm = QtGui.QTreeWidgetItem(parent)
-    itm.setText(0, text)
-    itm.setFlags(itm.flags() | Qt.ItemIsTristate | Qt.ItemIsUserCheckable)
-    itm.setCheckState(0, Qt.Checked)
-    return itm
+    item = QtGui.QTreeWidgetItem(parent)
+    item.setText(0, text)
+    item.setFlags(item.flags() | Qt.ItemIsTristate | Qt.ItemIsUserCheckable)
+    item.setCheckState(0, Qt.Checked)
+    return item
 
 
 #########################
@@ -259,6 +297,9 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
     bbox = None
     imgBox = None
     gpkg = None
+    configFile = None
+    isOnProcessing = False
+    forceStop = False
 
     def __init__(self, iface, parent=None):
         """Constructor."""
@@ -269,9 +310,14 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
         # http://qt-project.org/doc/qt-4.8/designer-using-a-ui-file.html
         # #widgets-and-dialogs-with-auto-connect
         self.setupUi(self)
-
+        self.edtSrcFile.setFocus()
         self.iface = iface
         self._connect_action()
+        self.configFile = os.path.join(os.path.dirname(__file__), 'onmap_loader.ini')
+        self.readConfig()
+        self.order(u"변환할 온맵(PDF)이나 이전에 변환된 지오패키지(GPKG)를 선택해 주세요.")
+        # 중지 기능 구현 실패로 일단 안보이게
+        self.btnStop.hide()
 
     def error(self, msg):
         self.editLog.appendHtml(u'<font color="red">{}</font>'.format(msg))
@@ -282,13 +328,14 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
     def debug(self, msg):
         self.editLog.appendHtml(u'<font color="gray">{}</font>'.format(msg))
 
+    def order(self, msg):
+        self.editLog.appendHtml(u'<font color="blue"><b>{}</b></font>'.format(msg))
+
     def _connect_action(self):
         self.connect(self.btnSrcFile, SIGNAL("clicked()"), self._on_click_btnSrcFile)
         self.connect(self.btnTgtFile, SIGNAL("clicked()"), self._on_click_btnTgtFile)
         self.connect(self.btnStart, SIGNAL("clicked()"), self._on_click_btnStart)
         self.connect(self.btnStop, SIGNAL("clicked()"), self._on_click_btnStop)
-        self.connect(self.btnStop, SIGNAL("textChanged()"), self._on_click_btnStop)
-        self.connect(self.btnStop, SIGNAL("textChanged()"), self._on_click_btnStop)
 
     def _on_click_btnSrcFile(self):
         qfd = QFileDialog()
@@ -317,7 +364,9 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
         # Layer List
         self.fillLayerTreeFromPdf()
         QgsApplication.restoreOverrideCursor()
-        self.info(u"레이어를 선택하고 [변환 시작] 버튼을 눌러주세요.")
+        self.order(u"레이어를 선택하고 [변환 시작] 버튼을 눌러주세요.")
+        self.btnStart.setEnabled(True)
+        self.writeConfig()
 
     def _on_click_btnTgtFile(self):
         qfd = QFileDialog()
@@ -336,40 +385,69 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
 
         # TODO: gpkg에서 레이어 리스트 읽어 오기
 
+        self.btnStart.setEnabled(True)
+
     def _on_click_btnStart(self):
-        self.pdfPath = self.edtSrcFile.text()
-        self.gpkgPath = self.edtTgtFile.text()
+        self.runImport()
 
-        if not os.path.exists(self.pdfPath):
-            self.error(u"선택한 온맵(PDF) 파일이 존재하지 않습니다.")
-            return
+    def _on_click_btnStop(self):
+        self.stopProcessing()
 
-        if not self.pdf:
-            rc = self.fillLayerTreeFromPdf()
-            if not rc:
+    def runImport(self):
+        try:
+            self.isOnProcessing = True
+
+            self.edtSrcFile.setEnabled(False)
+            self.edtTgtFile.setEnabled(False)
+            self.btnSrcFile.setEnabled(False)
+            self.btnTgtFile.setEnabled(False)
+            self.btnStop.setEnabled(True)
+            self.btnStart.setEnabled(False)
+
+            self.pdfPath = self.edtSrcFile.text()
+            self.gpkgPath = self.edtTgtFile.text()
+
+            if not os.path.exists(self.pdfPath):
+                self.error(u"선택한 온맵(PDF) 파일이 존재하지 않습니다.")
                 return
 
-        # 이미 있는 gpkg 이용할지 물어보기
-        if os.path.exists(self.gpkgPath):
-            rc = QMessageBox.question(self, u"GeoPackage 재활용",
-                                      u"이미 지오패키지 파일이 있습니다.\n"
-                                      u"다시 변환하지 않고 이 파일을 이용할까요?\n\n"
-                                      u"변환을 생략하면 더 빨리 열 수 있습니다.",
-                                      QMessageBox.Yes | QMessageBox.No)
-            if rc != QMessageBox.Yes:
+            if not self.pdf:
+                rc = self.fillLayerTreeFromPdf()
+                if not rc:
+                    return
+
+            # 이미 있는 gpkg 이용할지 물어보기
+            rc = None
+            if os.path.exists(self.gpkgPath):
+                rc = QMessageBox.question(self, u"GeoPackage 재활용",
+                                          u"이미 지오패키지 파일이 있습니다.\n"
+                                          u"다시 변환하지 않고 이 파일을 이용할까요?\n\n"
+                                          u"[예]를 누르면 변환을 생략하고 더 빨리 열 수 있습니다.\n"
+                                          u"[아니오]를 누르면 지오패키지 파일을 다시 생성합니다.",
+                                          QMessageBox.Yes | QMessageBox.No)
+
+            if not os.path.exists(self.gpkgPath) or rc != QMessageBox.Yes:
                 rc = self.createGeoPackage()
+                self.debug("DONE createGeoPackage")
                 if not rc:
                     QMessageBox.information(self, u"오류"
                                             , u"지오패키지(GPKG) 파일을 만들지 못해 중단됩니다.")
                     return
-                self.importPdfVector()
-                self.importPdfRaster()
-                pass
+                selectedLayerList = list()
+                self.getSelectedLayerList(selectedLayerList)
 
-        self.openGeoPackage()
+                self.importPdfVector(selectedLayerList)
 
-        # Project 좌표계로 변환하여 화면을 이동해야 한다.
-        try:
+                try:
+                    selectedLayerList.index(u"영상")
+                except ValueError:
+                    pass
+                else:
+                    self.importPdfRaster()
+
+            self.openGeoPackage(selectedLayerList)
+
+            # Project 좌표계로 변환하여 화면을 이동해야 한다.
             canvas = self.iface.mapCanvas()
             mapRenderer = canvas.mapRenderer()
             srs = mapRenderer.destinationCrs()
@@ -379,14 +457,67 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
             maxPnt = transform(mapProj, projProj, self.bbox[3][0], self.bbox[3][1])
             canvas.setExtent(QgsRectangle(minPnt[0], minPnt[1], maxPnt[0], maxPnt[1]))
             canvas.refresh()
-        except:
-            pass
+            self.info(u"온맵 불러오기 성공!")
 
-    def _on_click_btnStop(self):
+        except Exception as e:
+            self.error(unicode(e))
+        finally:
+            QgsApplication.restoreOverrideCursor()
+            self.isOnProcessing = False
+            # self.close()
+
+    def stopProcessing(self):
+        QMessageBox.information(self, "STOP!!!")
+
+        if not self.isOnProcessing:
+            return False
+
         rc = QMessageBox.question(self, u"작업 강제 중지",
                                   u"현재 작업을 강제로 중지하시겠습니까?\n\n"
                                   u"작업 중지는 오류의 원인이 될 수도 있습니다.",
                                   QMessageBox.Yes | QMessageBox.No)
+        if rc != QMessageBox.Yes:
+            return False
+
+        self.forceStop = True
+
+        self.edtSrcFile.setEnabled(True)
+        self.edtTgtFile.setEnabled(True)
+        self.btnSrcFile.setEnabled(True)
+        self.btnTgtFile.setEnabled(True)
+        self.btnStop.setEnabled(False)
+        self.btnStart.setEnabled(True)
+
+        return True
+
+    def close(self):
+        rc = self.stopProcessing()
+        if rc:  # 작업을 중지한 경우는 닫지 않음
+            return
+
+        self.writeConfig()
+        super(OnMapLoaderDialog, self).close()
+
+    def writeConfig(self):
+        conf = ConfigParser.SafeConfigParser()
+        conf.add_section('LastFile')
+        conf.set("LastFile", "pdf", self.pdfPath)
+        conf.set("LastFile", "gpkg", self.gpkgPath)
+        # fp = codecs.open(self.configFile, "w", "UTF-8")
+        fp = open(self.configFile, "w")
+        conf.write(fp)
+        fp.close()
+
+    def readConfig(self):
+        try:
+            conf = ConfigParser.SafeConfigParser()
+            # fp = codecs.open(self.configFile, "r", "UTF-8")
+            # conf.readfp(fp)
+            conf.read(self.configFile)
+            self.pdfPath = conf.get("LastFile", "pdf")
+            self.gpkgPath = conf.get("LastFile", "gpkg")
+        except Exception as e:
+            self.error(unicode(e))
 
     def fillLayerTreeFromPdf(self):
         self.pdfPath = self.edtSrcFile.text()
@@ -411,6 +542,7 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
                     level = i+1
                     titleList[level] = title
                     item = addTreeItem(parentList[level-1], title)
+                    item.layerName = name
                     parentList[level] = item
                     if level <= 2:
                         item.setExpanded(True)
@@ -423,19 +555,23 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
                         parentList.pop(j)
                     titleList[level] = title
                     item = addTreeItem(parentList[level-1], title)
+                    item.layerName = name
                     parentList[level] = item
                     if level <= 2:
                         item.setExpanded(True)
                     else:
                         item.setExpanded(False)
 
-        # TODO: 영상 추가
+        # 영상 추가
+        item = addTreeItem(parentList[0], u"영상")
+        item.layerName = u"영상"
+
         return True
 
     def getPdfInformation(self):
-        self.lblMainWork.setText(u"선택한 온맵 파일 분석중...")
         self.progressMainWork.setMinimum(0)
         self.progressMainWork.setMaximum(0)
+        self.lblMainWork.setText(u"선택한 온맵 파일 분석중...")
         self.info(u"PDF 파일에서 정보추출 시작...")
         force_gui_update()
 
@@ -458,7 +594,7 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
         try:
             pdf = srcDriver.Open(self.pdfPath, 0)
         except Exception, e:
-            print e
+            self.error(unicode(e))
             return
 
         # 좌표계 판단
@@ -491,7 +627,6 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
         for iLayer in range(pdf.GetLayerCount()):
             pdfLayer = pdf.GetLayerByIndex(iLayer)
             name = unicode(pdfLayer.GetName().decode('utf-8'))
-            print(name)
 
             if name.find(MAP_BOX_LAYER) >= 0:
                 mapBoxLayerId = iLayer
@@ -513,7 +648,7 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
                 elif geomType == ogr.wkbPolygon or geomType == ogr.wkbMultiPolygon:
                     polygonCount += 1
                 else:
-                    print(u"[Unknown Type] " + ogr.GeometryTypeToName(geomType))
+                    self.error(u"[Unknown Type] " + ogr.GeometryTypeToName(geomType))
 
                 # 도곽을 찾아 정보 추출
                 if mapBoxLayerId and mapBoxGeometry is None:
@@ -541,7 +676,7 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
             layerInfoList.append({'id': iLayer, 'name': name, "totalCount": totalFeatureCnt,
                                   "pointCount": pointCount, "lineCount": lineCount, "polygonCount": polygonCount})
 
-        print (boxLL, boxLR, boxTL, boxTR)
+        self.debug(unicode((boxLL, boxLR, boxTL, boxTR)))
 
         affineTransform, _ = calcAffineTranform(boxLL, boxLR, boxTL, boxTR, tmBoxLL, tmBoxLR, tmBoxTL, tmBoxTR)
 
@@ -565,6 +700,21 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
 
         return True
 
+    def getSelectedLayerList(self, selectedLayerList, root = None):
+        if not root:
+            root = self.treeLayer.invisibleRootItem()
+        signal_count = root.childCount()
+
+        for i in range(signal_count):
+            item = root.child(i)
+            if item.checkState(0) == Qt.Checked:
+                layerName = item.layerName
+                selectedLayerList.append(layerName)
+            if item.childCount() > 0:
+                self.getSelectedLayerList(selectedLayerList, item)
+
+        return
+
     def createGeoPackage(self):
         gpkg = None
 
@@ -582,87 +732,101 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
             if gpkg is None:
                 gpkg = driver.CreateDataSource(self.gpkgPath)
         except Exception, e:
-            print e
+            self.error(unicode(e))
             return
 
         self.gpkg = gpkg
         return True
 
-    def importPdfVector(self):
-        self.info (u"PDF에서 벡터정보 추출 시작...")
-        createdLayerName = []
+    def importPdfVector(self, selectedLayerList):
+        try:
+            self.info (u"PDF에서 벡터정보 추출 시작...")
+            createdLayerName = []
 
-        # 좌표계 정보 생성
-        crs = osr.SpatialReference()
-        crs.ImportFromEPSG(self.crsId)
+            # 좌표계 정보 생성
+            crs = osr.SpatialReference()
+            crs.ImportFromEPSG(self.crsId)
 
-        # Create QGIS Layer
-        for layerInfo in self.layerInfoList:
-            vPointLayer = None
-            vLineLayer = None
-            vPolygonLayer = None
+            # Create QGIS Layer
+            totalCount = len(self.layerInfoList)
+            crrIndex = 0
+            self.progressMainWork.setMinimum(0)
+            self.progressMainWork.setMaximum(totalCount)
+            for layerInfo in self.layerInfoList:
+                vPointLayer = None
+                vLineLayer = None
+                vPolygonLayer = None
+                layerName = layerInfo["name"]
 
-            # TODO: 사용자로 부터 옵션 받게 수정
-            # 지도정보_ 로 시작하는 레이어만 임포트
-            if not LAYER_FILTER.match(layerInfo["name"]):
-                continue
+                crrIndex += 1
+                self.progressMainWork.setValue(crrIndex)
+                self.lblMainWork.setText(u"{} 레이어 처리중({}/{})...".format(layerName, crrIndex, totalCount))
 
-            pdfLayer = self.pdf.GetLayerByIndex(layerInfo["id"])
-            if pdfLayer.GetLayerDefn().GetFieldCount() > 0:
-                print("FOUND ATTR!!!!")
-
-            for ogrFeature in pdfLayer:
-                geometry = ogrFeature.GetGeometryRef()
-                fid = ogrFeature.GetFID()
-                geomType = geometry.GetGeometryType()
-
-                if geomType == ogr.wkbPoint or geomType == ogr.wkbMultiPoint:
-                    if not vPointLayer:
-                        layerName = u"{}_Point".format(layerInfo["name"])
-                        vPointLayer = self.gpkg.CreateLayer(layerName.encode('utf-8'), crs, geom_type=ogr.wkbMultiPoint)
-                        field = ogr.FieldDefn("GID", ogr.OFTInteger)
-                        vPointLayer.CreateField(field)
-                        createdLayerName.append(layerName)
-                    vLayer = vPointLayer
-                elif geomType == ogr.wkbLineString or geomType == ogr.wkbMultiLineString:
-                    if not vLineLayer:
-                        layerName = u"{}_Line".format(layerInfo["name"])
-                        vLineLayer = self.gpkg.CreateLayer(layerName.encode('utf-8'), crs, geom_type=ogr.wkbMultiLineString)
-                        field = ogr.FieldDefn("GID", ogr.OFTInteger)
-                        vLineLayer.CreateField(field)
-                        createdLayerName.append(layerName)
-                    vLayer = vLineLayer
-                elif geomType == ogr.wkbPolygon or geomType == ogr.wkbMultiPolygon:
-                    if not vPolygonLayer:
-                        layerName = u"{}_Polygon".format(layerInfo["name"])
-                        vPolygonLayer = self.gpkg.CreateLayer(layerName.encode('utf-8'), crs, geom_type=ogr.wkbMultiPolygon)
-                        field = ogr.FieldDefn("GID", ogr.OFTInteger)
-                        vPolygonLayer.CreateField(field)
-                        createdLayerName.append(layerName)
-                    vLayer = vPolygonLayer
-                else:
-                    print ("[ERROR] Unknown geometry type: " + geometry.GetGeometryName())
+                # 선택된 레이어만 가져오기
+                try:
+                    index = selectedLayerList.index(layerName)
+                except ValueError:
+                    self.debug(u"Skipped Layer: {}".format(layerName))
                     continue
 
-                featureDefn = vLayer.GetLayerDefn()
-                feature = ogr.Feature(featureDefn)
-                feature.SetField("GID", fid)
+                self.debug(u"Processing Layer: {}".format(layerName))
 
-                # collect vertex
-                if geometry.GetGeometryCount() <= 0:
-                    pointList = geometry.GetPoints()
-                    srcNpArray = np.array(pointList, dtype=np.float32)
+                pdfLayer = self.pdf.GetLayerByIndex(layerInfo["id"])
+                totalFeature = pdfLayer.GetFeatureCount()
+                crrFeatureIndex = 0
+                self.progressSubWork.setMinimum(0)
+                self.progressSubWork.setMaximum(100)
+                oldPct = -1
+                for ogrFeature in pdfLayer:
+                    crrFeatureIndex += 1
+                    crrPct = int(crrFeatureIndex * 100 / totalFeature)
+                    if crrPct != oldPct:
+                        oldPct = crrPct
+                        self.progressSubWork.setValue(crrPct)
+                        self.lblSubWork.setText(u"객체 추출중 ({}/{})...".format(crrFeatureIndex, totalFeature))
+                    force_gui_update()
+                    if self.forceStop:
+                        raise StoppedByUserException
 
-                    # transform all vertex
-                    tgtNpList = self.affineTransform(srcNpArray)
+                    geometry = ogrFeature.GetGeometryRef()
+                    fid = ogrFeature.GetFID()
+                    geomType = geometry.GetGeometryType()
 
-                    # move vertex
-                    for i in range(0, len(srcNpArray)):
-                        geometry.SetPoint(i, tgtNpList[i][0], tgtNpList[i][1])
-                else:
-                    for geomId in range(geometry.GetGeometryCount()):
-                        geom = geometry.GetGeometryRef(geomId)
-                        pointList = geom.GetPoints()
+                    if geomType == ogr.wkbPoint or geomType == ogr.wkbMultiPoint:
+                        if not vPointLayer:
+                            layerName = u"{}_Point".format(layerName)
+                            vPointLayer = self.gpkg.CreateLayer(layerName.encode('utf-8'), crs, geom_type=ogr.wkbMultiPoint)
+                            field = ogr.FieldDefn("GID", ogr.OFTInteger)
+                            vPointLayer.CreateField(field)
+                            createdLayerName.append(layerName)
+                        vLayer = vPointLayer
+                    elif geomType == ogr.wkbLineString or geomType == ogr.wkbMultiLineString:
+                        if not vLineLayer:
+                            layerName = u"{}_Line".format(layerName)
+                            vLineLayer = self.gpkg.CreateLayer(layerName.encode('utf-8'), crs, geom_type=ogr.wkbMultiLineString)
+                            field = ogr.FieldDefn("GID", ogr.OFTInteger)
+                            vLineLayer.CreateField(field)
+                            createdLayerName.append(layerName)
+                        vLayer = vLineLayer
+                    elif geomType == ogr.wkbPolygon or geomType == ogr.wkbMultiPolygon:
+                        if not vPolygonLayer:
+                            layerName = u"{}_Polygon".format(layerName)
+                            vPolygonLayer = self.gpkg.CreateLayer(layerName.encode('utf-8'), crs, geom_type=ogr.wkbMultiPolygon)
+                            field = ogr.FieldDefn("GID", ogr.OFTInteger)
+                            vPolygonLayer.CreateField(field)
+                            createdLayerName.append(layerName)
+                        vLayer = vPolygonLayer
+                    else:
+                        self.error(u"[ERROR] Unknown geometry type: " + geometry.GetGeometryName())
+                        continue
+
+                    featureDefn = vLayer.GetLayerDefn()
+                    feature = ogr.Feature(featureDefn)
+                    feature.SetField("GID", fid)
+
+                    # collect vertex
+                    if geometry.GetGeometryCount() <= 0:
+                        pointList = geometry.GetPoints()
                         srcNpArray = np.array(pointList, dtype=np.float32)
 
                         # transform all vertex
@@ -670,15 +834,29 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
 
                         # move vertex
                         for i in range(0, len(srcNpArray)):
-                            geom.SetPoint(i, tgtNpList[i][0], tgtNpList[i][1])
+                            geometry.SetPoint(i, tgtNpList[i][0], tgtNpList[i][1])
+                    else:
+                        for geomId in range(geometry.GetGeometryCount()):
+                            geom = geometry.GetGeometryRef(geomId)
+                            pointList = geom.GetPoints()
+                            srcNpArray = np.array(pointList, dtype=np.float32)
 
-                feature.SetGeometry(geometry)
-                vLayer.CreateFeature(feature)
-                feature = None
+                            # transform all vertex
+                            tgtNpList = self.affineTransform(srcNpArray)
 
-            print u"Layer: {} - ".format(layerInfo["name"]),
+                            # move vertex
+                            for i in range(0, len(srcNpArray)):
+                                geom.SetPoint(i, tgtNpList[i][0], tgtNpList[i][1])
 
-        return True
+                    feature.SetGeometry(geometry)
+                    vLayer.CreateFeature(feature)
+                    feature = None
+
+            self.info(u"벡터 가져오기 완료")
+            return True
+        except StoppedByUserException:
+            self.error(u"사용자에 의해 중지됨")
+            return False
 
     def importPdfRaster(self):
         try:
@@ -869,22 +1047,42 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
 
         return True
 
-    def openGeoPackage(self):
+    def openGeoPackage(self, selectedLayerList):
         # 래스터 로딩
         try:
-            layer = self.iface.addRasterLayer(self.gpkgPath, u"영상", "gdal")
-        except:
-            layer = None
-        if not layer:
-            self.error(u"레이어 {} 읽기 실패".format(u"영상"))
+            selectedLayerList.index(u"영상")
+            try:
+                layer = self.iface.addRasterLayer(self.gpkgPath, u"영상", "gdal")
+            except:
+                layer = None
+            if not layer:
+                self.error(u"영상 레이어 읽기 실패".format(u""))
+        except ValueError:
+            pass
 
         # 벡터 로딩
         gpkg = None
         try:
             gpkg = ogr.Open(self.gpkgPath)
+            numLayer = gpkg.GetLayerCount()
+            crrLayerIndex = 0
+            self.progressMainWork.setMinimum(0)
+            self.progressMainWork.setMaximum(numLayer)
+            self.lblMainWork.setText(u"변환된 지오패키지 읽는 중...")
+            self.info(u"지오패키지 불러오기 시작")
 
             for layer in gpkg:
+                crrLayerIndex += 1
+                self.progressMainWork.setValue(crrLayerIndex)
+
                 layerName = unicode(layer.GetName().decode('utf-8'))
+
+                try:
+                    selectedLayerList.index(layerName)
+                except ValueError:
+                    self.debug(u"SKIP: {}".format(layerName))
+                    continue
+                self.debug(u"OPEN: {}".format(layerName))
 
                 try:
                     uri = u"{}|layername={}".format(self.gpkgPath, layerName)
@@ -893,7 +1091,7 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
                     layer = None
 
                 if not layer:
-                    self.error(u"레이어 {} 읽기 실패".format(layerName))
+                    self.error(u"{} 레이어 읽기 실패".format(layerName))
         finally:
             if gpkg:
                 del gpkg

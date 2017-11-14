@@ -25,7 +25,7 @@
      <item>
       <widget class="QLabel" name="lblMainWork">
        <property name="text">
-        <string>MainWorkName</string>
+        <string>전체 작업 진행상황</string>
        </property>
       </widget>
      </item>
@@ -52,7 +52,7 @@
      <item>
       <widget class="QLabel" name="lblSubWork">
        <property name="text">
-        <string>SubWorkName</string>
+        <string>현재 작업 진행상황</string>
        </property>
       </widget>
      </item>
@@ -70,7 +70,7 @@
      <item>
       <widget class="QLabel" name="lblTgtFile">
        <property name="text">
-        <string>변환된 공간정보가 담길 GeoPackage 파일:</string>
+        <string>변환된 공간정보가 저장될 지오패키지(GPKG) 파일:</string>
        </property>
       </widget>
      </item>
@@ -112,6 +112,9 @@
     <layout class="QHBoxLayout" name="horizontalLayout_3">
      <item>
       <widget class="QPushButton" name="btnStop">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
        <property name="minimumSize">
         <size>
          <width>0</width>
@@ -138,6 +141,9 @@
      </item>
      <item>
       <widget class="QPushButton" name="btnStart">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
        <property name="minimumSize">
         <size>
          <width>200</width>
@@ -156,7 +162,7 @@
         <string>변환 시작</string>
        </property>
        <property name="default">
-        <bool>true</bool>
+        <bool>false</bool>
        </property>
       </widget>
      </item>
@@ -167,7 +173,7 @@
      <item>
       <widget class="QLabel" name="lblSrcFile">
        <property name="text">
-        <string>변환대상 온맵(On-Map) 파일:</string>
+        <string>변환대상 온맵(PDF) 파일:</string>
        </property>
       </widget>
      </item>
@@ -192,6 +198,9 @@
         </property>
         <property name="text">
          <string>선택...</string>
+        </property>
+        <property name="default">
+         <bool>true</bool>
         </property>
        </widget>
       </widget>
@@ -222,7 +231,11 @@
     </layout>
    </item>
    <item row="7" column="0">
-    <widget class="QPlainTextEdit" name="editLog"/>
+    <widget class="QPlainTextEdit" name="editLog">
+     <property name="readOnly">
+      <bool>true</bool>
+     </property>
+    </widget>
    </item>
   </layout>
  </widget>
