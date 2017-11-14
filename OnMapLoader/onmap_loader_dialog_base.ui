@@ -79,7 +79,11 @@
        <property name="orientation">
         <enum>Qt::Horizontal</enum>
        </property>
-       <widget class="QLineEdit" name="edtTgtFile"/>
+       <widget class="QLineEdit" name="edtTgtFile">
+        <property name="readOnly">
+         <bool>true</bool>
+        </property>
+       </widget>
        <widget class="QPushButton" name="btnTgtFile">
         <property name="minimumSize">
          <size>
@@ -182,7 +186,11 @@
        <property name="orientation">
         <enum>Qt::Horizontal</enum>
        </property>
-       <widget class="QLineEdit" name="edtSrcFile"/>
+       <widget class="QLineEdit" name="edtSrcFile">
+        <property name="readOnly">
+         <bool>true</bool>
+        </property>
+       </widget>
        <widget class="QPushButton" name="btnSrcFile">
         <property name="minimumSize">
          <size>

@@ -300,6 +300,7 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
     configFile = None
     isOnProcessing = False
     forceStop = False
+    readMode = "PDF"
 
     def __init__(self, iface, parent=None):
         """Constructor."""
@@ -354,18 +355,41 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
 
         base, _ = os.path.splitext(path)
         self.gpkgPath = base + ".gpkg"
-
         self.edtTgtFile.setText(self.gpkgPath)
 
-        # Clear log window
-        QgsApplication.setOverrideCursor(Qt.WaitCursor)
-        self.editLog.clear()
+        # GPKG가 존재하면 재사용 확인
+        rc = None
+        if os.path.exists(self.gpkgPath):
+            rc = QMessageBox.question(self, u"GeoPackage 재활용",
+                                      u"이미 지오패키지 파일이 있습니다.\n"
+                                      u"다시 변환하지 않고 이 파일을 이용할까요?\n\n"
+                                      u"[예]를 누르면 변환을 생략하고 더 빨리 열 수 있습니다.\n"
+                                      u"[아니오]를 누르면 지오패키지 파일을 다시 생성합니다.",
+                                      QMessageBox.Yes | QMessageBox.No)
 
-        # Layer List
-        self.fillLayerTreeFromPdf()
-        QgsApplication.restoreOverrideCursor()
-        self.order(u"레이어를 선택하고 [변환 시작] 버튼을 눌러주세요.")
-        self.btnStart.setEnabled(True)
+        if rc != QMessageBox.Yes:
+            # PDF에서 읽는 경우
+            self.readMode = "PDF"
+            self.btnStart.setText(u"변환 시작")
+            rc = self.fillLayerTreeFromPdf()
+            if not rc:
+                self.error(u"온맵(PDF) 파일에서 지리정보를 추출하지 못했습니다. 온맵이 아닌 듯 합니다.")
+                return
+
+            self.order(u"레이어를 선택하고 [변환 시작] 버튼을 눌러주세요.")
+            self.btnStart.setEnabled(True)
+        else:
+            # GPKG에서 읽는 경우
+            self.readMode = "GPKG"
+            self.btnStart.setText(u"읽기 시작")
+            rc = self.fillLayerTreeFromGpkg()
+            if not rc:
+                self.error(u"지오패키지(GPKG) 파일에서 레이어 정보를 읽지 못했습니다.")
+                return
+
+            self.order(u"레이어를 선택하고 [읽기 시작] 버튼을 눌러주세요.")
+            self.btnStart.setEnabled(True)
+
         self.writeConfig()
 
     def _on_click_btnTgtFile(self):
@@ -404,37 +428,24 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
             self.btnStop.setEnabled(True)
             self.btnStart.setEnabled(False)
 
-            self.pdfPath = self.edtSrcFile.text()
-            self.gpkgPath = self.edtTgtFile.text()
+            selectedLayerList = list()
+            self.getSelectedLayerList(selectedLayerList)
+            if len(selectedLayerList) == 0:
+                self.error(u"선택된 레이어가 하나도 없어 진행할 수 없습니다.")
+                raise Exception()
 
-            if not os.path.exists(self.pdfPath):
-                self.error(u"선택한 온맵(PDF) 파일이 존재하지 않습니다.")
-                return
+            if self.readMode == "PDF":
+                if not os.path.exists(self.pdfPath):
+                    raise Exception(u"선택한 온맵(PDF) 파일이 존재하지 않습니다.")
 
-            if not self.pdf:
-                rc = self.fillLayerTreeFromPdf()
-                if not rc:
-                    return
+                if not self.pdf:
+                    rc = self.fillLayerTreeFromPdf()
+                    if not rc:
+                        raise Exception(u"온맵(PDF) 파일에서 지리정보를 찾지 못했습니다.")
 
-            # 이미 있는 gpkg 이용할지 물어보기
-            rc = None
-            if os.path.exists(self.gpkgPath):
-                rc = QMessageBox.question(self, u"GeoPackage 재활용",
-                                          u"이미 지오패키지 파일이 있습니다.\n"
-                                          u"다시 변환하지 않고 이 파일을 이용할까요?\n\n"
-                                          u"[예]를 누르면 변환을 생략하고 더 빨리 열 수 있습니다.\n"
-                                          u"[아니오]를 누르면 지오패키지 파일을 다시 생성합니다.",
-                                          QMessageBox.Yes | QMessageBox.No)
-
-            if not os.path.exists(self.gpkgPath) or rc != QMessageBox.Yes:
                 rc = self.createGeoPackage()
-                self.debug("DONE createGeoPackage")
                 if not rc:
-                    QMessageBox.information(self, u"오류"
-                                            , u"지오패키지(GPKG) 파일을 만들지 못해 중단됩니다.")
-                    return
-                selectedLayerList = list()
-                self.getSelectedLayerList(selectedLayerList)
+                    raise Exception(u"지오패키지(GPKG) 파일을 만들지 못했습니다.")
 
                 self.importPdfVector(selectedLayerList)
 
@@ -459,16 +470,23 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
             canvas.refresh()
             self.info(u"온맵 불러오기 성공!")
 
+            # self.close()
+
         except Exception as e:
             self.error(unicode(e))
         finally:
             QgsApplication.restoreOverrideCursor()
             self.isOnProcessing = False
-            # self.close()
 
+            self.edtSrcFile.setEnabled(True)
+            self.edtTgtFile.setEnabled(True)
+            self.btnSrcFile.setEnabled(True)
+            self.btnTgtFile.setEnabled(True)
+            self.btnStop.setEnabled(False)
+            self.btnStart.setEnabled(True)
+
+    # 실제 동작중 이벤트가 오지 않는 문제가 있어 개발 중지
     def stopProcessing(self):
-        QMessageBox.information(self, "STOP!!!")
-
         if not self.isOnProcessing:
             return False
 
@@ -490,13 +508,14 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
 
         return True
 
-    def close(self):
-        rc = self.stopProcessing()
-        if rc:  # 작업을 중지한 경우는 닫지 않음
-            return
-
-        self.writeConfig()
-        super(OnMapLoaderDialog, self).close()
+    def closeEvent(self, event):
+        # rc = self.stopProcessing()
+        # if rc:  # 작업을 중지한 경우는 닫지 않음
+        if self.isOnProcessing:
+            event.ignore()
+        else:
+            self.writeConfig()
+            event.accept()
 
     def writeConfig(self):
         conf = ConfigParser.SafeConfigParser()
@@ -520,51 +539,115 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
             self.error(unicode(e))
 
     def fillLayerTreeFromPdf(self):
-        self.pdfPath = self.edtSrcFile.text()
-        rc =  self.getPdfInformation()
-        if not rc:
-            self.error(u"PDF 파일에서 정보를 추출하지 못했습니다. 온맵 PDF가 아닌 듯 합니다.")
-            return
+        QgsApplication.setOverrideCursor(Qt.WaitCursor)
 
-        self.treeLayer.clear()
-        parentList = dict()
-        parentList[0] = self.treeLayer
-        titleList = dict()
-        titleList[0] = "ROOT"
-        for layerInfo in self.layerInfoList:
-            name = layerInfo["name"]
-            if not LAYER_FILTER.match(name):
-                continue
-            nameList = name.split("_")
-            for i in range(len(nameList)):
-                title = nameList[i]
-                if not titleList.has_key(i+1):
-                    level = i+1
-                    titleList[level] = title
-                    item = addTreeItem(parentList[level-1], title)
-                    item.layerName = name
-                    parentList[level] = item
-                    if level <= 2:
-                        item.setExpanded(True)
-                    else:
-                        item.setExpanded(False)
-                elif titleList[i+1] != title:
-                    level = i+1
-                    for j in range(level, len(titleList)):
-                        titleList.pop(j)
-                        parentList.pop(j)
-                    titleList[level] = title
-                    item = addTreeItem(parentList[level-1], title)
-                    item.layerName = name
-                    parentList[level] = item
-                    if level <= 2:
-                        item.setExpanded(True)
-                    else:
-                        item.setExpanded(False)
+        try:
+            self.pdfPath = self.edtSrcFile.text()
+            rc =  self.getPdfInformation()
+            if not rc:
+                self.error(u"PDF 파일에서 정보를 추출하지 못했습니다. 온맵 PDF가 아닌 듯 합니다.")
+                raise Exception()
 
-        # 영상 추가
-        item = addTreeItem(parentList[0], u"영상")
-        item.layerName = u"영상"
+            self.treeLayer.clear()
+            parentList = dict()
+            parentList[0] = self.treeLayer
+            # 영상 추가
+            item = addTreeItem(parentList[0], u"영상")
+            item.layerName = u"영상"
+
+            titleList = dict()
+            titleList[0] = "ROOT"
+            for layerInfo in self.layerInfoList:
+                name = layerInfo["name"]
+                if not LAYER_FILTER.match(name):
+                    continue
+                nameList = name.split("_")
+                for i in range(len(nameList)):
+                    title = nameList[i]
+                    if not titleList.has_key(i+1):
+                        level = i+1
+                        titleList[level] = title
+                        item = addTreeItem(parentList[level-1], title)
+                        item.layerName = name
+                        parentList[level] = item
+                        if level <= 2:
+                            item.setExpanded(True)
+                        else:
+                            item.setExpanded(False)
+                    elif titleList[i+1] != title:
+                        level = i+1
+                        for j in range(level, len(titleList)):
+                            titleList.pop(j)
+                            parentList.pop(j)
+                        titleList[level] = title
+                        item = addTreeItem(parentList[level-1], title)
+                        item.layerName = name
+                        parentList[level] = item
+                        if level <= 2:
+                            item.setExpanded(True)
+                        else:
+                            item.setExpanded(False)
+        except:
+            return False
+        finally:
+            QgsApplication.restoreOverrideCursor()
+
+        return True
+
+    # TODO: GPKG 읽게 구현 필요
+    def fillLayerTreeFromGpkg(self):
+        QgsApplication.setOverrideCursor(Qt.WaitCursor)
+
+        try:
+            self.pdfPath = self.edtSrcFile.text()
+            rc = self.getPdfInformation()
+            if not rc:
+                self.error(u"PDF 파일에서 정보를 추출하지 못했습니다. 온맵 PDF가 아닌 듯 합니다.")
+                raise Exception()
+
+            self.treeLayer.clear()
+            parentList = dict()
+            parentList[0] = self.treeLayer
+            # 영상 추가
+            item = addTreeItem(parentList[0], u"영상")
+            item.layerName = u"영상"
+
+            titleList = dict()
+            titleList[0] = "ROOT"
+            for layerInfo in self.layerInfoList:
+                name = layerInfo["name"]
+                if not LAYER_FILTER.match(name):
+                    continue
+                nameList = name.split("_")
+                for i in range(len(nameList)):
+                    title = nameList[i]
+                    if not titleList.has_key(i + 1):
+                        level = i + 1
+                        titleList[level] = title
+                        item = addTreeItem(parentList[level - 1], title)
+                        item.layerName = name
+                        parentList[level] = item
+                        if level <= 2:
+                            item.setExpanded(True)
+                        else:
+                            item.setExpanded(False)
+                    elif titleList[i + 1] != title:
+                        level = i + 1
+                        for j in range(level, len(titleList)):
+                            titleList.pop(j)
+                            parentList.pop(j)
+                        titleList[level] = title
+                        item = addTreeItem(parentList[level - 1], title)
+                        item.layerName = name
+                        parentList[level] = item
+                        if level <= 2:
+                            item.setExpanded(True)
+                        else:
+                            item.setExpanded(False)
+        except:
+            return False
+        finally:
+            QgsApplication.restoreOverrideCursor()
 
         return True
 
@@ -739,6 +822,7 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
         return True
 
     def importPdfVector(self, selectedLayerList):
+        QgsApplication.setOverrideCursor(Qt.WaitCursor)
         try:
             self.info (u"PDF에서 벡터정보 추출 시작...")
             createdLayerName = []
@@ -853,198 +937,258 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
                     feature = None
 
             self.info(u"벡터 가져오기 완료")
-            return True
         except StoppedByUserException:
             self.error(u"사용자에 의해 중지됨")
+            QgsApplication.restoreOverrideCursor()
+            return False
+        except Exception:
+            QgsApplication.restoreOverrideCursor()
             return False
 
+        QgsApplication.restoreOverrideCursor()
+        return True
+
     def importPdfRaster(self):
+        QgsApplication.setOverrideCursor(Qt.WaitCursor)
         try:
+            self.info(u"영상 정보 추출시작")
+            self.progressMainWork.setMinimum(0)
+            self.progressMainWork.setMaximum(4)
+
             fh = open(self.pdfPath, "rb")
             pdfObj = PyPDF2.PdfFileReader(fh)
-        except RuntimeError, e:
-            return
 
-        pageObj = pdfObj.getPage(0)
+            pageObj = pdfObj.getPage(0)
 
-        try:
-            xObject = pageObj['/Resources']['/XObject'].getObject()
-        except KeyError:
-            return
+            try:
+                xObject = pageObj['/Resources']['/XObject'].getObject()
+            except KeyError:
+                raise Exception(u"영상 레이어가 없어 가져올 수 없습니다.")
 
-        images = {}
+            self.progressMainWork.setValue(1)
+            self.lblMainWork.setText(u"영상 조각 추출중...")
 
-        for obj in xObject:
-            if xObject[obj]['/Subtype'] == '/Image':
-                name = obj[1:]
-                m = NUM_FILTER.search(name)
-                try:
-                    id = int(m.group(1))
-                except:
+            images = {}
+            totalCount = len(xObject)
+            self.progressSubWork.setMinimum(0)
+            self.progressSubWork.setMaximum(totalCount)
+            crrIndex = 0
+
+            for obj in xObject:
+                crrIndex += 1
+                self.progressSubWork.setValue(crrIndex)
+                self.lblSubWork.setText(u"영상 조각 처리중({}/{})...".format(crrIndex, totalCount))
+
+                if xObject[obj]['/Subtype'] == '/Image':
+                    name = obj[1:]
+                    m = NUM_FILTER.search(name)
+                    try:
+                        id = int(m.group(1))
+                    except:
+                        continue
+                    size = (xObject[obj]['/Width'], xObject[obj]['/Height'])
+
+                    # 작은 이미지 무시
+                    if size[0] < SKIP_IMAGE_WIDTH:
+                        continue
+
+                    colorSpace = xObject[obj]['/ColorSpace']
+                    if colorSpace == '/DeviceRGB':
+                        mode = "RGB"
+                    elif colorSpace == '/DeviceCMYK':
+                        mode = "CMYK"
+                    elif colorSpace == '/DeviceGray':
+                        mode = "L"
+                    elif colorSpace[0] == "/Indexed":
+                        mode = "P"
+                        colorSpace, base, hival, lookup = [v.getObject() for v in colorSpace]
+                        palette = lookup.getData()
+                    elif colorSpace[0] == "/ICCBased":
+                        mode = "P"
+                        lookup = colorSpace[1].getObject()
+                        palette = lookup.getData()
+                    else:
+                        continue
+
+                    try:
+                        stream = xObject[obj]
+                        data = stream._data
+                        filters = stream.get("/Filter", ())
+                        if type(filters) is not PyPDF2.generic.ArrayObject:
+                            filters = [filters]
+                        leftFilters = copy.deepcopy(filters)
+
+                        if data:
+                            for filterType in filters:
+                                if filterType == "/FlateDecode" or filterType == "/Fl":
+                                    data = FlateDecode.decode(data, stream.get("/DecodeParms"))
+                                    leftFilters.remove(filterType)
+                                elif filterType == "/ASCIIHexDecode" or filterType == "/AHx":
+                                    data = ASCIIHexDecode.decode(data)
+                                    leftFilters.remove(filterType)
+                                elif filterType == "/LZWDecode" or filterType == "/LZW":
+                                    data = LZWDecode.decode(data, stream.get("/DecodeParms"))
+                                    leftFilters.remove(filterType)
+                                elif filterType == "/ASCII85Decode" or filterType == "/A85":
+                                    data = ASCII85Decode.decode(data)
+                                    leftFilters.remove(filterType)
+                                elif filterType == "/Crypt":
+                                    decodeParams = stream.get("/DecodeParams", {})
+                                    if "/Name" not in decodeParams and "/Type" not in decodeParams:
+                                        pass
+                                    else:
+                                        raise NotImplementedError("/Crypt filter with /Name or /Type not supported yet")
+                                    leftFilters.remove(filterType)
+                                elif filterType == ():
+                                    leftFilters.remove(filterType)
+
+                            # case of Flat image
+                            if len(leftFilters) == 0:
+                                img = Image.frombytes(mode, size, data)
+                                if mode == "P":
+                                    img.putpalette(palette)
+                                if mode == "CMYK":
+                                    img = img.convert('RGB')
+                                images[id] = img
+
+                            # case of JPEG
+                            elif len(leftFilters) == 1 and leftFilters[0] == '/DCTDecode':
+                                jpgData = BytesIO(data)
+                                img = Image.open(jpgData)
+                                if mode == "CMYK":
+                                    imgData = np.frombuffer(img.tobytes(), dtype='B')
+                                    invData = np.full(imgData.shape, 255, dtype='B')
+                                    invData -= imgData
+                                    img = Image.frombytes(img.mode, img.size, invData.tobytes())
+                                images[id] = img
+                    except:
+                        pass
+
+            fh.close()
+            del pdfObj
+
+            # 이미지를 ID 순으로 연결
+            self.info(u"영상 병합 시작")
+            self.progressMainWork.setValue(2)
+            self.lblMainWork.setText(u"영상 병합중...")
+
+            keys = images.keys()
+            keys.sort()
+
+            totalCount = len(keys)
+            self.progressSubWork.setMinimum(0)
+            self.progressSubWork.setMaximum(totalCount)
+
+            mergedWidth = None
+            mergedHeight = None
+            mergedMode = None
+            crrIndex = 0
+            for key in keys:
+                crrIndex += 1
+                self.progressSubWork.setValue(crrIndex)
+                self.lblSubWork.setText(u"영상 조각 처리중({}/{})...".format(crrIndex, totalCount))
+
+                image = images[key]
+                width, height = image.size
+
+                if mergedWidth is None:
+                    mergedWidth, mergedHeight = width, height
+                    mergedMode = image.mode
                     continue
-                size = (xObject[obj]['/Width'], xObject[obj]['/Height'])
 
-                # 작은 이미지 무시
-                if size[0] < SKIP_IMAGE_WIDTH:
-                    continue
+                if width != mergedWidth:
+                    break
 
-                colorSpace = xObject[obj]['/ColorSpace']
-                if colorSpace == '/DeviceRGB':
-                    mode = "RGB"
-                elif colorSpace == '/DeviceCMYK':
-                    mode = "CMYK"
-                elif colorSpace == '/DeviceGray':
-                    mode = "L"
-                elif colorSpace[0] == "/Indexed":
-                    mode = "P"
-                    colorSpace, base, hival, lookup = [v.getObject() for v in colorSpace]
-                    palette = lookup.getData()
-                elif colorSpace[0] == "/ICCBased":
-                    mode = "P"
-                    lookup = colorSpace[1].getObject()
-                    palette = lookup.getData()
-                else:
-                    continue
+                mergedHeight += height
 
-                try:
-                    stream = xObject[obj]
-                    data = stream._data
-                    filters = stream.get("/Filter", ())
-                    if type(filters) is not PyPDF2.generic.ArrayObject:
-                        filters = [filters]
-                    leftFilters = copy.deepcopy(filters)
+            mergedImage = Image.new("RGB", (mergedWidth, mergedHeight))
+            crrY = 0
+            for key in keys:
+                image = images[key].transpose(Image.FLIP_TOP_BOTTOM)
+                mergedImage.paste(image, (0, crrY))
+                crrY += image.height
+                del image
+                del images[key]
 
-                    if data:
-                        for filterType in filters:
-                            if filterType == "/FlateDecode" or filterType == "/Fl":
-                                data = FlateDecode.decode(data, stream.get("/DecodeParms"))
-                                leftFilters.remove(filterType)
-                            elif filterType == "/ASCIIHexDecode" or filterType == "/AHx":
-                                data = ASCIIHexDecode.decode(data)
-                                leftFilters.remove(filterType)
-                            elif filterType == "/LZWDecode" or filterType == "/LZW":
-                                data = LZWDecode.decode(data, stream.get("/DecodeParms"))
-                                leftFilters.remove(filterType)
-                            elif filterType == "/ASCII85Decode" or filterType == "/A85":
-                                data = ASCII85Decode.decode(data)
-                                leftFilters.remove(filterType)
-                            elif filterType == "/Crypt":
-                                decodeParams = stream.get("/DecodeParams", {})
-                                if "/Name" not in decodeParams and "/Type" not in decodeParams:
-                                    pass
-                                else:
-                                    raise NotImplementedError("/Crypt filter with /Name or /Type not supported yet")
-                                leftFilters.remove(filterType)
-                            elif filterType == ():
-                                leftFilters.remove(filterType)
+            images.clear()
 
-                        # case of Flat image
-                        if len(leftFilters) == 0:
-                            img = Image.frombytes(mode, size, data)
-                            if mode == "P":
-                                img.putpalette(palette)
-                            if mode == "CMYK":
-                                img = img.convert('RGB')
-                            images[id] = img
+            self.info(u"병합된 영상을 지오패키지에 저장 시작")
+            self.progressMainWork.setValue(3)
+            self.lblMainWork.setText(u"병합된 영상 저장중...")
 
-                        # case of JPEG
-                        elif len(leftFilters) == 1 and leftFilters[0] == '/DCTDecode':
-                            jpgData = BytesIO(data)
-                            img = Image.open(jpgData)
-                            if mode == "CMYK":
-                                imgData = np.frombuffer(img.tobytes(), dtype='B')
-                                invData = np.full(imgData.shape, 255, dtype='B')
-                                invData -= imgData
-                                img = Image.frombytes(img.mode, img.size, invData.tobytes())
-                            images[id] = img
-                except:
-                    pass
+            self.progressSubWork.setMinimum(0)
+            self.progressSubWork.setMaximum(5)
+            self.progressSubWork.setValue(0)
+            self.lblSubWork.setText(u"영상 저장중...")
 
-        fh.close()
-        del pdfObj
+            # 좌표계 정보 생성
+            crs = osr.SpatialReference()
+            crs.ImportFromEPSG(self.crsId)
+            crs_wkt = crs.ExportToWkt()
 
-        # 이미지를 ID 순으로 연결
-        keys = images.keys()
-        keys.sort()
+            # 매트릭스 계산
+            srcList = [
+                [0, mergedHeight],
+                [mergedWidth, mergedHeight],
+                [0, 0],
+                [mergedWidth, 0]
+            ]
+            srcNpArray = np.array(srcList, dtype=np.float32)
 
-        mergedWidth = None
-        mergedHeight = None
-        mergedMode = None
-        for key in keys:
-            image = images[key]
-            width, height = image.size
+            _, matrix = calcAffineTranform(
+                srcNpArray[0], srcNpArray[1], srcNpArray[2], srcNpArray[3],
+                self.imgBox[0], self.imgBox[1], self.imgBox[2], self.imgBox[3]
+            )
 
-            if mergedWidth is None:
-                mergedWidth, mergedHeight = width, height
-                mergedMode = image.mode
-                continue
+            driver = gdal.GetDriverByName("GPKG")
+            dataset = driver.Create(
+                self.gpkgPath,
+                mergedWidth,
+                mergedHeight,
+                3,
+                gdal.GDT_Byte,
+                options=["APPEND_SUBDATASET=YES", "RASTER_TABLE=PHOTO_IMAGE", "TILE_FORMAT=JPEG"]
+            )
 
-            if width != mergedWidth:
-                break
+            dataset.SetProjection(crs_wkt)
+            xScale = math.sqrt(matrix[0][0] ** 2 + matrix[1][0] ** 2)
+            yScale = math.sqrt(matrix[0][1] ** 2 + matrix[1][1] ** 2)
+            dataset.SetGeoTransform((matrix[0][2], xScale, 0.0, matrix[1][2], 0.0, -yScale))
 
-            mergedHeight += height
+            self.progressSubWork.setValue(1)
 
-        mergedImage = Image.new("RGB", (mergedWidth, mergedHeight))
-        crrY = 0
-        for key in keys:
-            image = images[key].transpose(Image.FLIP_TOP_BOTTOM)
-            mergedImage.paste(image, (0, crrY))
-            crrY += image.height
-            del image
-            del images[key]
+            # TODO: 이 다음 부분에서 메모리 오류가 있다.
+            band1 = np.array(list(mergedImage.getdata(0))).reshape(-1, mergedWidth)
+            self.progressSubWork.setValue(2)
+            band2 = np.array(list(mergedImage.getdata(1))).reshape(-1, mergedWidth)
+            self.progressSubWork.setValue(3)
+            band3 = np.array(list(mergedImage.getdata(2))).reshape(-1, mergedWidth)
+            self.progressSubWork.setValue(4)
 
-        images.clear()
+            dataset.GetRasterBand(1).WriteArray(band1)
+            dataset.GetRasterBand(2).WriteArray(band2)
+            dataset.GetRasterBand(3).WriteArray(band3)
+            dataset.FlushCache()
+            self.progressSubWork.setValue(5)
+            # dataset.ReleaseResultSet(dataset)
 
-        # 좌표계 정보 생성
-        crs = osr.SpatialReference()
-        crs.ImportFromEPSG(self.crsId)
-        crs_wkt = crs.ExportToWkt()
+            mergedImage.close()
+            del mergedImage
+            del band1
+            del band2
+            del band3
+            del dataset
+            self.progressMainWork.setValue(4)
 
-        # 매트릭스 계산
-        srcList = [
-            [0, mergedHeight],
-            [mergedWidth, mergedHeight],
-            [0, 0],
-            [mergedWidth, 0]
-        ]
-        srcNpArray = np.array(srcList, dtype=np.float32)
+        except Exception as e:
+            self.error(e)
+            QgsApplication.restoreOverrideCursor()
+            self.error(u"영상 가져오기 실패")
+            return False
 
-        _, matrix = calcAffineTranform(
-            srcNpArray[0], srcNpArray[1], srcNpArray[2], srcNpArray[3],
-            self.imgBox[0], self.imgBox[1], self.imgBox[2], self.imgBox[3]
-        )
-
-        driver = gdal.GetDriverByName("GPKG")
-        dataset = driver.Create(
-            self.gpkgPath,
-            mergedWidth,
-            mergedHeight,
-            3,
-            gdal.GDT_Byte,
-            options=["APPEND_SUBDATASET=YES", "RASTER_TABLE=PHOTO_IMAGE", "TILE_FORMAT=JPEG"]
-        )
-
-        dataset.SetProjection(crs_wkt)
-        xScale = math.sqrt(matrix[0][0] ** 2 + matrix[1][0] ** 2)
-        yScale = math.sqrt(matrix[0][1] ** 2 + matrix[1][1] ** 2)
-        dataset.SetGeoTransform((matrix[0][2], xScale, 0.0, matrix[1][2], 0.0, -yScale))
-
-        band1 = np.array(list(mergedImage.getdata(0))).reshape(-1, mergedWidth)
-        band2 = np.array(list(mergedImage.getdata(1))).reshape(-1, mergedWidth)
-        band3 = np.array(list(mergedImage.getdata(2))).reshape(-1, mergedWidth)
-
-        dataset.GetRasterBand(1).WriteArray(band1)
-        dataset.GetRasterBand(2).WriteArray(band2)
-        dataset.GetRasterBand(3).WriteArray(band3)
-        dataset.FlushCache()
-
-        mergedImage.close()
-        del mergedImage
-        del band1
-        del band2
-        del band3
-        del dataset
-
+        QgsApplication.restoreOverrideCursor()
+        self.lblMainWork.setText(u"영상 처리 완료")
+        self.info(u"영상 가져오기 완료")
         return True
 
     def openGeoPackage(self, selectedLayerList):
@@ -1064,6 +1208,9 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
         gpkg = None
         try:
             gpkg = ogr.Open(self.gpkgPath)
+            if not gpkg:
+                raise Exception()
+
             numLayer = gpkg.GetLayerCount()
             crrLayerIndex = 0
             self.progressMainWork.setMinimum(0)
@@ -1076,9 +1223,10 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
                 self.progressMainWork.setValue(crrLayerIndex)
 
                 layerName = unicode(layer.GetName().decode('utf-8'))
+                orgLayerName = layerName.strip("_Point").strip("_Line").strip("_Polygon")
 
                 try:
-                    selectedLayerList.index(layerName)
+                    selectedLayerList.index(orgLayerName)
                 except ValueError:
                     self.debug(u"SKIP: {}".format(layerName))
                     continue
@@ -1092,6 +1240,8 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
 
                 if not layer:
                     self.error(u"{} 레이어 읽기 실패".format(layerName))
+        except Exception as e:
+            self.error(e)
         finally:
             if gpkg:
                 del gpkg
