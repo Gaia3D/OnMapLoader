@@ -937,9 +937,7 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
                         self.lblSubWork.setText(u"객체 추출중 ({}/{})...".format(crrFeatureIndex, totalFeature))
                     force_gui_update()
 
-                    # TODO: 멈추지 않는 문제 해결
                     if self.forceStop:
-                        # return False
                         raise StoppedByUserException()
 
                     geometry = ogrFeature.GetGeometryRef()
@@ -1039,6 +1037,8 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
 
             self.progressMainWork.setValue(1)
             self.lblMainWork.setText(u"영상 조각 추출중...")
+            if self.forceStop:
+                raise StoppedByUserException()
 
             images = {}
             totalCount = len(xObject)
@@ -1051,6 +1051,8 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
                 self.progressSubWork.setValue(crrIndex)
                 self.lblSubWork.setText(u"영상 조각 처리중({}/{})...".format(crrIndex, totalCount))
                 force_gui_update()
+                if self.forceStop:
+                    raise StoppedByUserException()
 
                 if xObject[obj]['/Subtype'] == '/Image':
                     name = obj[1:]
@@ -1144,6 +1146,8 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
             self.info(u"영상 병합 시작")
             self.progressMainWork.setValue(2)
             self.lblMainWork.setText(u"영상 병합중...")
+            if self.forceStop:
+                raise StoppedByUserException()
 
             keys = images.keys()
             keys.sort()
@@ -1161,6 +1165,8 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
                 self.progressSubWork.setValue(crrIndex)
                 self.lblSubWork.setText(u"영상 조각 처리중({}/{})...".format(crrIndex, totalCount))
                 force_gui_update()
+                if self.forceStop:
+                    raise StoppedByUserException()
 
                 image = images[key]
                 width, height = image.size
@@ -1189,11 +1195,15 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
             self.info(u"병합된 영상을 지오패키지에 저장 시작")
             self.progressMainWork.setValue(3)
             self.lblMainWork.setText(u"병합된 영상 저장중...")
+            if self.forceStop:
+                raise StoppedByUserException()
 
             self.progressSubWork.setMinimum(0)
             self.progressSubWork.setMaximum(5)
             self.progressSubWork.setValue(0)
             self.lblSubWork.setText(u"영상 저장중...")
+            if self.forceStop:
+                raise StoppedByUserException()
 
             # 좌표계 정보 생성
             crs = osr.SpatialReference()
@@ -1221,7 +1231,6 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
                 mergedHeight,
                 3,
                 gdal.GDT_Byte,
-                # options=["APPEND_SUBDATASET=YES", "RASTER_TABLE=PHOTO_IMAGE", "TILE_FORMAT=JPEG"]
                 options=["APPEND_SUBDATASET=YES", u"RASTER_TABLE=영상", "TILE_FORMAT=JPEG"]
             )
 
@@ -1232,25 +1241,36 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
 
             self.progressSubWork.setValue(1)
             force_gui_update()
+            if self.forceStop:
+                raise StoppedByUserException()
 
             # TODO: 이 다음 부분에서 메모리 오류가 있다.
             band1 = np.array(list(mergedImage.getdata(0))).reshape(-1, mergedWidth)
             self.progressSubWork.setValue(2)
             force_gui_update()
+            if self.forceStop:
+                raise StoppedByUserException()
             band2 = np.array(list(mergedImage.getdata(1))).reshape(-1, mergedWidth)
             self.progressSubWork.setValue(3)
             force_gui_update()
+            if self.forceStop:
+                raise StoppedByUserException()
             band3 = np.array(list(mergedImage.getdata(2))).reshape(-1, mergedWidth)
             self.progressSubWork.setValue(4)
             force_gui_update()
+            if self.forceStop:
+                raise StoppedByUserException()
 
             dataset.GetRasterBand(1).WriteArray(band1)
             dataset.GetRasterBand(2).WriteArray(band2)
             dataset.GetRasterBand(3).WriteArray(band3)
             dataset.FlushCache()
+            # dataset.ReleaseResultSet(dataset)
+
             self.progressSubWork.setValue(5)
             force_gui_update()
-            # dataset.ReleaseResultSet(dataset)
+            if self.forceStop:
+                raise StoppedByUserException()
 
             mergedImage.close()
             del mergedImage
@@ -1261,6 +1281,10 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
             self.progressMainWork.setValue(4)
             force_gui_update()
 
+        except StoppedByUserException:
+            QgsApplication.restoreOverrideCursor()
+            self.error(u"사용자에 의해 중지됨")
+            return False
         except Exception as e:
             self.error(e)
             QgsApplication.restoreOverrideCursor()
@@ -1275,109 +1299,130 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
     def openGeoPackage(self, selectedRasterLayerList, selectedVectorLayerList):
         QgsApplication.setOverrideCursor(Qt.WaitCursor)
 
-        if self.readMode == "PDF":
-            # 래스터 로딩
-            try:
-                selectedRasterLayerList.index(u"영상")
+        try:
+            if self.readMode == "PDF":
+                # 래스터 로딩
                 try:
-                    layer = self.iface.addRasterLayer(self.gpkgPath, u"영상", "gdal")
-                except:
-                    layer = None
-                if not layer:
-                    self.error(u"영상 레이어 읽기 실패")
-            except ValueError:
-                pass
+                    selectedRasterLayerList.index(u"영상")
+                    try:
+                        layer = self.iface.addRasterLayer(self.gpkgPath, u"영상", "gdal")
+                    except:
+                        layer = None
+                    if not layer:
+                        self.error(u"영상 레이어 읽기 실패")
+                except ValueError:
+                    pass
 
-            # 벡터 로딩
-            gpkg = None
-            try:
-                gpkg = ogr.Open(self.gpkgPath)
-                if not gpkg:
-                    raise Exception()
+                # 벡터 로딩
+                gpkg = None
+                try:
+                    gpkg = ogr.Open(self.gpkgPath)
+                    if not gpkg:
+                        raise Exception()
 
-                numLayer = gpkg.GetLayerCount()
-                iLayer = 0
+                    numLayer = gpkg.GetLayerCount()
+                    iLayer = 0
+                    self.progressMainWork.setMinimum(0)
+                    self.progressMainWork.setMaximum(numLayer)
+                    self.lblMainWork.setText(u"변환된 지오패키지 읽는 중...")
+                    self.info(u"지오패키지 불러오기 시작")
+                    self.progressSubWork.setMinimum(0)
+                    self.progressSubWork.setMaximum(numLayer)
+
+                    for layer in gpkg:
+                        iLayer += 1
+                        self.progressMainWork.setValue(iLayer)
+                        self.progressSubWork.setValue(iLayer)
+                        self.lblSubWork.setText(u"벡터 레이어 읽는 중({}/{})...".format(iLayer, numLayer))
+                        force_gui_update()
+                        if self.forceStop:
+                            raise StoppedByUserException()
+
+                        layerName = unicode(layer.GetName().decode('utf-8'))
+                        orgLayerName = layerName.strip("_Point").strip("_Line").strip("_Polygon")
+
+                        try:
+                            selectedVectorLayerList.index(orgLayerName)
+                        except ValueError:
+                            self.debug(u"SKIP: {}".format(layerName))
+                            continue
+                        self.debug(u"OPEN: {}".format(layerName))
+
+                        try:
+                            uri = u"{}|layername={}".format(self.gpkgPath, layerName)
+                            layer = self.iface.addVectorLayer(uri, None, "ogr")
+                            try:
+                                layer.setName(layerName)
+                            except:
+                                layer.setLayerName(layerName)
+                        except:
+                            layer = None
+
+                        if not layer:
+                            self.error(u"{} 레이어 읽기 실패".format(layerName))
+                except Exception as e:
+                    self.error(e)
+                finally:
+                    if gpkg:
+                        del gpkg
+            else: # self.readMode == "GPKG"
+                numLayer = len(selectedRasterLayerList) + len(selectedVectorLayerList)
                 self.progressMainWork.setMinimum(0)
                 self.progressMainWork.setMaximum(numLayer)
-                self.lblMainWork.setText(u"변환된 지오패키지 읽는 중...")
+                self.lblMainWork.setText(u"기존 지오패키지 읽는 중...")
                 self.info(u"지오패키지 불러오기 시작")
+
+                iLayer = 0
                 self.progressSubWork.setMinimum(0)
                 self.progressSubWork.setMaximum(numLayer)
 
-                for layer in gpkg:
+                # 래스터 로딩
+                for layerName in selectedRasterLayerList:
                     iLayer += 1
                     self.progressMainWork.setValue(iLayer)
                     self.progressSubWork.setValue(iLayer)
-                    self.lblSubWork.setText(u"벡터 레이어 읽는 중({}/{})...".format(iLayer, numLayer))
+                    self.lblSubWork.setText(u"레이어 읽는 중({}/{})...".format(iLayer, numLayer))
                     force_gui_update()
-
-                    layerName = unicode(layer.GetName().decode('utf-8'))
-                    orgLayerName = layerName.strip("_Point").strip("_Line").strip("_Polygon")
-
+                    if self.forceStop:
+                        raise StoppedByUserException()
                     try:
-                        selectedVectorLayerList.index(orgLayerName)
-                    except ValueError:
-                        self.debug(u"SKIP: {}".format(layerName))
-                        continue
-                    self.debug(u"OPEN: {}".format(layerName))
+                        self.debug(layerName)
+                        layer = self.iface.addRasterLayer(self.gpkgPath, layerName, "gdal")
+                    except:
+                        layer = None
+                    if not layer:
+                        self.error(u"{} 레이어 읽기 실패".format(layerName))
 
+                # 벡터 로딩
+                for layerName in selectedVectorLayerList:
+                    iLayer += 1
+                    self.progressMainWork.setValue(iLayer)
+                    self.progressSubWork.setValue(iLayer)
+                    self.lblSubWork.setText(u"레이어 읽는 중({}/{})...".format(iLayer, numLayer))
+                    force_gui_update()
+                    if self.forceStop:
+                        raise StoppedByUserException()
                     try:
                         uri = u"{}|layername={}".format(self.gpkgPath, layerName)
                         layer = self.iface.addVectorLayer(uri, None, "ogr")
-                        layer.setLayerName(layerName)
+                        try:
+                            layer.setName(layerName)
+                        except:
+                            layer.setLayerName(layerName)
                     except:
                         layer = None
-
                     if not layer:
                         self.error(u"{} 레이어 읽기 실패".format(layerName))
-            except Exception as e:
-                self.error(e)
-            finally:
-                if gpkg:
-                    del gpkg
-        else: # self.readMode == "GPKG"
-            numLayer = len(selectedRasterLayerList) + len(selectedVectorLayerList)
-            self.progressMainWork.setMinimum(0)
-            self.progressMainWork.setMaximum(numLayer)
-            self.lblMainWork.setText(u"기존 지오패키지 읽는 중...")
-            self.info(u"지오패키지 불러오기 시작")
 
-            iLayer = 0
-            self.progressSubWork.setMinimum(0)
-            self.progressSubWork.setMaximum(numLayer)
-
-            # 래스터 로딩
-            for layerName in selectedRasterLayerList:
-                iLayer += 1
-                self.progressMainWork.setValue(iLayer)
-                self.progressSubWork.setValue(iLayer)
-                self.lblSubWork.setText(u"레이어 읽는 중({}/{})...".format(iLayer, numLayer))
-                force_gui_update()
-                try:
-                    self.debug(layerName)
-                    layer = self.iface.addRasterLayer(self.gpkgPath, u"영상", "gdal")
-                    # uri = u"{}|layername={}".format(self.gpkgPath, layerName)
-                    # layer = self.iface.addRasterLayer(uri, u"영상", "gdal")
-                except:
-                    layer = None
-                if not layer:
-                    self.error(u"{} 레이어 읽기 실패".format(layerName))
-
-            # 벡터 로딩
-            for layerName in selectedVectorLayerList:
-                iLayer += 1
-                self.progressMainWork.setValue(iLayer)
-                self.progressSubWork.setValue(iLayer)
-                self.lblSubWork.setText(u"레이어 읽는 중({}/{})...".format(iLayer, numLayer))
-                force_gui_update()
-                try:
-                    uri = u"{}|layername={}".format(self.gpkgPath, layerName)
-                    layer = self.iface.addVectorLayer(uri, None, "ogr")
-                    layer.setLayerName(layerName)
-                except:
-                    layer = None
-                if not layer:
-                    self.error(u"{} 레이어 읽기 실패".format(layerName))
+        except StoppedByUserException:
+            QgsApplication.restoreOverrideCursor()
+            self.error(u"사용자에 의해 중지됨")
+            return False
+        except Exception as e:
+            self.error(e)
+            QgsApplication.restoreOverrideCursor()
+            self.error(u"영상 가져오기 실패")
+            return False
 
         QgsApplication.restoreOverrideCursor()
         self.info(u"지오패키지 불러오기 완료")
