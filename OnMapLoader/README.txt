@@ -1,33 +1,22 @@
-Plugin Builder Results
+====================
+OnMap Loader Plugin 
+온맵 로더 플러그인
+====================
 
-Your plugin OnMapLoader was created in:
-    C:\Temp\OnMapLoader
+This program is an assistant tool that allows you to read OnMap PDF files distributed by the Korea National Geographic Information Insititute(NGII) from QGIS and display them in the correct geographical location. 
+This program has been developed as part of the 'Development of the Spatial information quality inspection System' project by NGII. 
 
-Your QGIS plugin directory is located at:
-    C:/Users/jangbi/.qgis2/python/plugins
+이 프로그램은 대한민국 국토지리정보원에서 배포하는 온맵 PDF 파일을 QGIS에서 읽어 올바른 지리적 위치에 보일 수 있게 해 주는 보조도구 입니다. 
+이 프로그램은 국토지리정보원의 '공간정보 품질검사 시스템 개발'사업의 일부로 개발되었습니다.
 
-What's Next:
+* Homepage
+  https://gaia3d.github.io/OnMapLoader/
+  
+* Source Repogitory 
+  https://github.com/Gaia3D/OnMapLoader
 
-  * Copy the entire directory containing your new plugin to the QGIS plugin
-    directory
-
-  * Compile the resources file using pyrcc4
-
-  * Run the tests (``make test``)
-
-  * Test the plugin by enabling it in the QGIS plugin manager
-
-  * Customize it by editing the implementation file: ``onmap_loader.py``
-
-  * Create your own custom icon, replacing the default icon.png
-
-  * Modify your user interface by opening OnMapLoader.ui in Qt Designer
-
-  * You can use the Makefile to compile your Ui and resource files when
-    you make changes. This requires GNU make (gmake)
-
-For more information, see the PyQGIS Developer Cookbook at:
-http://www.qgis.org/pyqgis-cookbook/index.html
-
-(C) 2011-2014 GeoApt LLC - geoapt.com
-Git revision : $Format:%H$
+* Author
+  BJ Jang at Gaia3D
+    
+* License
+  GPL2

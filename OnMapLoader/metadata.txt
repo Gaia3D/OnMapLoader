@@ -11,10 +11,10 @@ name=OnMap Loader
 qgisMinimumVersion=2.14
 description=Tool for loading OnMap(Korea NGII PDF Map) to QGIS
 version=1.0
-author=BJ Jang / Gaia3D
+author=BJ Jang of Gaia3D
 email=jangbi882@gmail.com
 
-about=This program is an assistant tool that allows you to read OnMap PDF files distributed by the Korea National Geographic Information Insititute(NGII) from QGIS and display them in the correct geographical location. This program has been developed as part of the 'Development of a Support System for Utilization of Geographic Information' project by NGII 이 프로그램은 대한민국 국토지리정보원에서 배포하는 온맵 PDF 파일을 QGIS에서 읽어 올바른 지리적 위치에 보일 수 있게 해 주는 보조도구 입니다. 이 프로그램은 국토지리정보원의 '공간정보 융함활용 지원시스템 개발'사업의 일부로 개발되었습니다.
+about=This program is an assistant tool that allows you to read OnMap PDF files distributed by the Korea National Geographic Information Insititute(NGII) from QGIS and display them in the correct geographical location. This program has been developed as part of the 'Development of the Spatial information quality inspection System' project by NGII. 이 프로그램은 대한민국 국토지리정보원에서 배포하는 온맵 PDF 파일을 QGIS에서 읽어 올바른 지리적 위치에 보일 수 있게 해 주는 보조도구 입니다. 이 프로그램은 국토지리정보원의 '공간정보 품질검사 시스템 개발'사업의 일부로 개발되었습니다.
 
 tracker=https://github.com/Gaia3D/OnMapLoader/issues
 repository=https://github.com/Gaia3D/OnMapLoader
@@ -28,8 +28,8 @@ repository=https://github.com/Gaia3D/OnMapLoader
 # Tags are comma separated with spaces allowed
 tags=OnMap, PDF, Korea, NGII
 
-homepage=https://github.com/Gaia3D/OnMapLoader
-category=Vector
+homepage=https://gaia3d.github.io/OnMapLoader/
+category=Plugin
 icon=icon.png
 # experimental flag
 experimental=False
