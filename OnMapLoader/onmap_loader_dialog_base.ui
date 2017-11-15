@@ -128,6 +128,9 @@
        <property name="text">
         <string>작업중지</string>
        </property>
+       <property name="autoExclusive">
+        <bool>true</bool>
+       </property>
       </widget>
      </item>
      <item>
@@ -163,7 +166,7 @@
         </font>
        </property>
        <property name="text">
-        <string>변환 시작</string>
+        <string>온맵 변환 시작</string>
        </property>
        <property name="default">
         <bool>false</bool>

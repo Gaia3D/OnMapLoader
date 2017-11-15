@@ -163,7 +163,7 @@ class OnMapLoader:
         self.add_action(
             icon_path,
             # text=self.tr('NGII 온맵(On-Map) 로더'),
-            text=u'NGII 온맵(On-Map) 로더',
+            text=u'NGII 온맵(On-Map) 로더 ',
             callback=self.run,
             parent=self.iface.mainWindow())
         icon_path = os.path.dirname(__file__) + "/help.png"
@@ -197,8 +197,7 @@ class OnMapLoader:
             pass
 
     def help(self):
-        webbrowser.open_new(u'http://geeps.krihs.re.kr/?wiki=GeoCoding%20for%20Korea')
-        # QMessageBox.information(None, "", "TEST")
+        webbrowser.open_new(u'https://gaia3d.github.io/OnMapLoader/')
 
     def _init_dialog(self):
         # Create the dialog (after translation) and keep reference
