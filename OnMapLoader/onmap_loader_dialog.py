@@ -20,8 +20,6 @@
  *                                                                         *
  ***************************************************************************/
 """
-
-import os
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 from PyQt4 import QtGui, uic
@@ -32,9 +30,19 @@ import numpy as np
 import copy
 import ConfigParser
 
+import sys
+import os
+ext_lib_path = os.path.join(QgsApplication.qgisSettingsDirPath(),"python",'lib')
+sys.path.append(ext_lib_path)
+
 # import OGR
 from osgeo import ogr, gdal, osr
-from pyproj import Proj, transform
+try:
+    from pyproj import Proj, transform
+except:
+    import pip
+    pip.main(['install', "pyproj", "--target={install_path}".format(install_path=ext_lib_path)])
+    from pyproj import Proj, transform
 
 try:
     import PyPDF2
@@ -42,7 +50,7 @@ try:
     from PyPDF2.pdf import *
 except:
     import pip
-    pip.main(['install', "PyPDF2"])
+    pip.main(['install', "PyPDF2", "--target={install_path}".format(install_path=ext_lib_path)])
     import PyPDF2
     from PyPDF2.filters import *
     from PyPDF2.pdf import *

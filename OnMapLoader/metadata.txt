@@ -10,7 +10,7 @@
 name=OnMap Loader
 qgisMinimumVersion=2.14
 description=Tool for loading OnMap(Korea NGII PDF Map) to QGIS
-version=1.0
+version=1.1
 author=BJ Jang of Gaia3D
 email=jangbi882@gmail.com
 
