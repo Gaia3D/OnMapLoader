@@ -28,12 +28,15 @@ The QGIS Plugin for loading Korea NGII OnMap(PDF Map)
    - 설치된 QGIS Desktop을 실행합니다.
    - 플러그인 – 플러그인 관리 및 설치… 메뉴 선택해 플러그인 관리자를 띄웁니다.
    - 검색: 항목에 OnMap을 입력해 OnMap Loader를 찾습니다.
-      ![Plugin Manager](images/install_pluginmanager.png)
+
+      ![Plugin Manager](images/install_pluginmamager.png)
    - [플러그인 설치] 버튼을 눌러 설치하면 끝~
 
 ## 처음으로 OnMap Loader 실행하기
   1. 툴바에서 ON MAP 아이콘을 찾아 누릅니다.
-    ![OnMap Icon](images/toolbar_icon.png)
+
+  ![OnMap Icon](images/toolbar_icon.png)
+
   2. 창이 뜨면 [선택…] 버튼을 누릅니다.
   3. 온맵 PDF 파일을 선택합니다.
   4. 공간정보로 변환할 레이어를 선택합니다.
