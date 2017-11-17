@@ -32,7 +32,7 @@ The QGIS Plugin for loading Korea NGII OnMap(PDF Map)
 
 ## 처음으로 OnMap Loader 실행하기
   1. 툴바에서 ON MAP 아이콘을 찾아 누릅니다.
-  2. 창이 뜨면 [선택…] 버튼을 누릅니다.
+  2. 창이 뜨면 [선택…] 버튼을 누릅니다.
   3. 온맵 PDF 파일을 선택합니다.
   4. 공간정보로 변환할 레이어를 선택합니다.
   5. [온맵 변환 시작] 버튼을 누릅니다.
