@@ -37,6 +37,8 @@ sys.path.append(ext_lib_path)
 
 # import OGR
 from osgeo import ogr, gdal, osr
+gdal.UseExceptions()
+
 try:
     from pyproj import Proj, transform
 except:
@@ -191,10 +193,16 @@ def findConner(points):
 
 
 def findMapNo(fileBase):
-    MAP_NO_FILTER = re.compile(u".*온맵_(.*)$")
-    res = MAP_NO_FILTER.search(fileBase)
+    # MAP_NO_FILTER = re.compile(u".*온맵_(.*)$")
+    # res = MAP_NO_FILTER.search(fileBase)
+    # if res:
+    #     return os.path.splitext(res.group(1))[0]
+    # else:
+    #     return None
+    # 맥의 한글 문제 해결 위해 추가
+    res = re.search(u"(?i).*_(.*)\.pdf$", fileBase)
     if res:
-        return os.path.splitext(res.group(1))[0]
+        return res.group(1)
     else:
         return None
 
