@@ -59,7 +59,11 @@ The QGIS Plugin for loading Korea NGII OnMap(PDF Map)
   3. 온맵에 들어있는 영상을 포함한 다양한 레이어들이 보입니다.
   4. [온맵 변환 시작] 버튼을 누르고 진행상황을 지켜봅니다.
 
+   ![ClickBrowse](images/dialog_progress.png)
+
   공간정보로 변환된 온맵이 QGIS에 올라왔습니다.
+
+   ![ClickBrowse](images/qgis_complete.png)
 
 ## 다른 공간정보와 함께 온맵을 보자
   * 다음 지도 위에 온맵 공간정보가 올라온 모습
