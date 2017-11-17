@@ -43,11 +43,11 @@ The QGIS Plugin for loading Korea NGII OnMap(PDF Map)
 
   3. 온맵 PDF 파일을 선택합니다.
 
-   ![ClickBrowse](images/dialog_browsepdf.png)
+   ![Browse PDF](images/dialog_browsepdf.png)
 
   4. 공간정보로 변환할 레이어를 선택합니다.
 
-   ![ClickBrowse](images/dialog_layer.png)
+   ![Select Layer](images/dialog_layer.png)
 
   5. [온맵 변환 시작] 버튼을 누릅니다.
 
@@ -59,11 +59,11 @@ The QGIS Plugin for loading Korea NGII OnMap(PDF Map)
   3. 온맵에 들어있는 영상을 포함한 다양한 레이어들이 보입니다.
   4. [온맵 변환 시작] 버튼을 누르고 진행상황을 지켜봅니다.
 
-   ![ClickBrowse](images/dialog_progress.png)
+   ![Progressing](images/dialog_progress.png)
 
   공간정보로 변환된 온맵이 QGIS에 올라왔습니다.
 
-   ![ClickBrowse](images/qgis_complete.png)
+   ![Completed](images/qgis_complete.png)
 
 ## 다른 공간정보와 함께 온맵을 보자
   * 다음 지도 위에 온맵 공간정보가 올라온 모습
@@ -77,6 +77,8 @@ The QGIS Plugin for loading Korea NGII OnMap(PDF Map)
   - 이 시간의 대부분이 PDF 파일에서 공간정보를 추출해 올바른 위치로 변환하는 시간입니다.
   - 그럼 변환된 공간정보를 저장해 두면 더 빠르지 않을까요?
   - OnMap Loader는 변환시 공간정보를 지오패키지(GPKG)로 저장해 이후 1분 내에 불러올 수 있게 해줍니다.
+
+  ![Using Geopackage](images/use_geopackage.png)
 
     - 지오패키지(GeoPackage)는 SHP를 대체하는 OGC의 새로운 공간정보 교환 표준입니다.
     - 지오패키지에는 한 파일에 벡터와 영상이 모두 들어갈 수 있고, 좌표계 등의 메타정보도 들어갑니다.
