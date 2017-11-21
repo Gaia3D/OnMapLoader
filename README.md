@@ -1,5 +1,6 @@
 # OnMapLoader
 The QGIS Plugin for loading Korea NGII OnMap(PDF Map)
+
 국토리지정보원 온맵(On-Map) 로딩 플러그인
 
 국토리지정보원의 온맵(On-Map) 지도를 GeoPackage로 만든 후 QGIS에 올바른 지리좌표에 맞게 불러주는 플러그인입니다.
@@ -92,6 +93,4 @@ The QGIS Plugin for loading Korea NGII OnMap(PDF Map)
   - 도엽명에서 해당 온맵의 공간적 위치와 좌표계를 판단해 지리적 위치에 맞게 Affine 변환합니다.
   - 추출된 공간정보를 모두 한 개의 지오패키지 파일에 저장합니다.
   - 지오패키지에 저장된 공간정보를 QGIS에 불러옵니다.
-
-
- 
+  
