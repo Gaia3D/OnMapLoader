@@ -39,23 +39,9 @@ sys.path.append(ext_lib_path)
 from osgeo import ogr, gdal, osr
 gdal.UseExceptions()
 
-try:
-    from pyproj import Proj, transform
-except:
-    import pip
-    pip.main(['install', "pyproj", "--target={install_path}".format(install_path=ext_lib_path)])
-    from pyproj import Proj, transform
-
-try:
-    import PyPDF2
-    from PyPDF2.filters import *
-    from PyPDF2.pdf import *
-except:
-    import pip
-    pip.main(['install', "PyPDF2", "--target={install_path}".format(install_path=ext_lib_path)])
-    import PyPDF2
-    from PyPDF2.filters import *
-    from PyPDF2.pdf import *
+import PyPDF2
+from PyPDF2.filters import *
+from PyPDF2.pdf import *
 
 from PIL import Image
 from io import BytesIO
@@ -723,11 +709,21 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
         else:
             crsId = 5188
 
-        p = Proj(init="epsg:{}".format(crsId))
-        tmBoxLL = p(boxLL[0], boxLL[1])
-        tmBoxLR = p(boxLR[0], boxLR[1])
-        tmBoxTL = p(boxTL[0], boxTL[1])
-        tmBoxTR = p(boxTR[0], boxTR[1])
+        # p = Proj(init="epsg:{}".format(crsId))
+        # tmBoxLL = p(boxLL[0], boxLL[1])
+        # tmBoxLR = p(boxLR[0], boxLR[1])
+        # tmBoxTL = p(boxTL[0], boxTL[1])
+        # tmBoxTR = p(boxTR[0], boxTR[1])
+
+        fromCrs = osr.SpatialReference()
+        fromCrs.ImportFromEPSG(4326)
+        toCrs = osr.SpatialReference()
+        toCrs.ImportFromEPSG(crsId)
+        p = osr.CoordinateTransformation(fromCrs, toCrs)
+        tmBoxLL = p.TransformPoint(boxLL[0], boxLL[1])
+        tmBoxLR = p.TransformPoint(boxLR[0], boxLR[1])
+        tmBoxTL = p.TransformPoint(boxTL[0], boxTL[1])
+        tmBoxTR = p.TransformPoint(boxTR[0], boxTR[1])
 
         # use OGR specific exceptions
         # list to store layers'names

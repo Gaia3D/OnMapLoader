@@ -5,7 +5,6 @@ import sys, os
 
 # import OGR
 from osgeo import ogr, gdal, osr
-from pyproj import Proj, transform
 
 from qgis.core import *
 try:
@@ -27,17 +26,9 @@ import tempfile
 import timeit
 import math
 
-try:
-    import PyPDF2
-    from PyPDF2.filters import *
-    from PyPDF2.pdf import *
-except:
-    import pip
-
-    pip.main(['install', "PyPDF2"])
-    import PyPDF2
-    from PyPDF2.filters import *
-    from PyPDF2.pdf import *
+import PyPDF2
+from PyPDF2.filters import *
+from PyPDF2.pdf import *
 
 from PIL import Image
 from io import BytesIO
@@ -269,11 +260,15 @@ def getPdfInformation(pdfFilePath):
     else:
         crsId = 5188
 
-    p = Proj(init="epsg:{}".format(crsId))
-    tmBoxLL = p(boxLL[0], boxLL[1])
-    tmBoxLR = p(boxLR[0], boxLR[1])
-    tmBoxTL = p(boxTL[0], boxTL[1])
-    tmBoxTR = p(boxTR[0], boxTR[1])
+    fromCrs = osr.SpatialReference()
+    fromCrs.ImportFromEPSG(4326)
+    toCrs = osr.SpatialReference()
+    toCrs.ImportFromEPSG(crsId)
+    p = osr.CoordinateTransformation(fromCrs, toCrs)
+    tmBoxLL = p.TransformPoint(boxLL[0], boxLL[1])
+    tmBoxLR = p.TransformPoint(boxLR[0], boxLR[1])
+    tmBoxTL = p.TransformPoint(boxTL[0], boxTL[1])
+    tmBoxTR = p.TransformPoint(boxTR[0], boxTR[1])
 
     # print(tmBoxLL, tmBoxLR, tmBoxTL, tmBoxTR)
 
