@@ -24,9 +24,15 @@ from PyQt4.QtCore import QSettings, QTranslator, qVersion, QCoreApplication
 from PyQt4.QtGui import QAction, QIcon
 from PyQt4.QtGui import *
 
+try:
+    from PIL import Image
+except:
+    raise Exception(u"PIL 라이브러리가 없어 실행할 수 없습니다.\nhttp://www.kyngchaos.com/software/python 에서 PIL을 설치하실 수 있습니다.")
+
 # Import the code for the dialog
 from onmap_loader_dialog import OnMapLoaderDialog
 import os.path
+import os
 import webbrowser
 from osgeo import gdal, ogr
 
@@ -45,7 +51,7 @@ class OnMapLoader:
         """
         checkMsg = self.checkGdal()
         if checkMsg is not None:
-            raise Exception(checkMsg)
+            raise Exception(checkMsg.encode("UTF-8"))
 
         # Save reference to the QGIS interface
         self.iface = iface
@@ -77,7 +83,11 @@ class OnMapLoader:
         if gdal.VersionInfo() < "2000000":
             return u"죄송합니다. GDAL 버전이 낮아 실행 불가능합니다.\nGDAL 2.0 이상이 필요합니다."
         if not ogr.GetDriverByName("PDF"):
-            return u"죄송합니다. 설치된 GDAL이 PDF를 지원하지 않아 실행 불가능합니다."
+            msg = u"죄송합니다. 설치된 GDAL이 PDF를 지원하지 않아 실행 불가능합니다."
+            if os.name == "posix":
+                msg += u"\n다음 경로에서 GeoPDF Plugin을 받아 설치후 다시 실행해 주십시오."
+                msg += u"\nhttp://www.kyngchaos.com/files/software/frameworks/GDAL-GeoPDF_Plugin-2.1.1-1.dmg"
+            return msg
         if not ogr.GetDriverByName("GPKG"):
             return u"죄송합니다. 설치된 GDAL이 GeoPackage를 지원하지 않아 실행 불가능합니다."
         return None

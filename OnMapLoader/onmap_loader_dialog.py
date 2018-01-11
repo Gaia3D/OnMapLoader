@@ -956,27 +956,27 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
 
                     if geomType == ogr.wkbPoint or geomType == ogr.wkbMultiPoint:
                         if not vPointLayer:
-                            layerName = u"{}_Point".format(layerName)
-                            vPointLayer = self.gpkg.CreateLayer(layerName.encode('utf-8'), crs, geom_type=ogr.wkbMultiPoint)
+                            outLayerName = u"{}_Point".format(layerName)
+                            vPointLayer = self.gpkg.CreateLayer(outLayerName.encode('utf-8'), crs, geom_type=ogr.wkbMultiPoint)
                             field = ogr.FieldDefn("GID", ogr.OFTInteger)
                             vPointLayer.CreateField(field)
-                            createdLayerName.append(layerName)
+                            createdLayerName.append(outLayerName)
                         vLayer = vPointLayer
                     elif geomType == ogr.wkbLineString or geomType == ogr.wkbMultiLineString:
                         if not vLineLayer:
-                            layerName = u"{}_Line".format(layerName)
-                            vLineLayer = self.gpkg.CreateLayer(layerName.encode('utf-8'), crs, geom_type=ogr.wkbMultiLineString)
+                            outLayerName = u"{}_Line".format(layerName)
+                            vLineLayer = self.gpkg.CreateLayer(outLayerName.encode('utf-8'), crs, geom_type=ogr.wkbMultiLineString)
                             field = ogr.FieldDefn("GID", ogr.OFTInteger)
                             vLineLayer.CreateField(field)
-                            createdLayerName.append(layerName)
+                            createdLayerName.append(outLayerName)
                         vLayer = vLineLayer
                     elif geomType == ogr.wkbPolygon or geomType == ogr.wkbMultiPolygon:
                         if not vPolygonLayer:
-                            layerName = u"{}_Polygon".format(layerName)
-                            vPolygonLayer = self.gpkg.CreateLayer(layerName.encode('utf-8'), crs, geom_type=ogr.wkbMultiPolygon)
+                            outLayerName = u"{}_Polygon".format(layerName)
+                            vPolygonLayer = self.gpkg.CreateLayer(outLayerName.encode('utf-8'), crs, geom_type=ogr.wkbMultiPolygon)
                             field = ogr.FieldDefn("GID", ogr.OFTInteger)
                             vPolygonLayer.CreateField(field)
-                            createdLayerName.append(layerName)
+                            createdLayerName.append(outLayerName)
                         vLayer = vPolygonLayer
                     else:
                         self.error(u"[ERROR] Unknown geometry type: " + geometry.GetGeometryName())
