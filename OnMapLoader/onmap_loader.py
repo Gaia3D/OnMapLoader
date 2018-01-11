@@ -27,7 +27,7 @@ from PyQt4.QtGui import *
 try:
     from PIL import Image
 except:
-    raise Exception(u"PIL 라이브러리가 없어 실행할 수 없습니다.\nhttp://www.kyngchaos.com/software/python 에서 PIL을 설치하실 수 있습니다.")
+    raise Exception(u"죄송합니다. PIL 라이브러리가 없어 실행할 수 없습니다.\nhttp://www.kyngchaos.com/software/python 에서 PIL을 설치하실 수 있습니다.")
 
 # Import the code for the dialog
 from onmap_loader_dialog import OnMapLoaderDialog

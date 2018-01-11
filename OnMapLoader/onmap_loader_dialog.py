@@ -961,6 +961,8 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
                             field = ogr.FieldDefn("GID", ogr.OFTInteger)
                             vPointLayer.CreateField(field)
                             createdLayerName.append(outLayerName)
+                            self.debug(u"layerName:" + layerName)
+                            self.debug(u"outLayerName:" + outLayerName)
                         vLayer = vPointLayer
                     elif geomType == ogr.wkbLineString or geomType == ogr.wkbMultiLineString:
                         if not vLineLayer:
@@ -969,6 +971,8 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
                             field = ogr.FieldDefn("GID", ogr.OFTInteger)
                             vLineLayer.CreateField(field)
                             createdLayerName.append(outLayerName)
+                            self.debug(u"layerName:" + layerName)
+                            self.debug(u"outLayerName:" + outLayerName)
                         vLayer = vLineLayer
                     elif geomType == ogr.wkbPolygon or geomType == ogr.wkbMultiPolygon:
                         if not vPolygonLayer:
@@ -977,6 +981,8 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
                             field = ogr.FieldDefn("GID", ogr.OFTInteger)
                             vPolygonLayer.CreateField(field)
                             createdLayerName.append(outLayerName)
+                            self.debug(u"layerName:" + layerName)
+                            self.debug(u"outLayerName:" + outLayerName)
                         vLayer = vPolygonLayer
                     else:
                         self.error(u"[ERROR] Unknown geometry type: " + geometry.GetGeometryName())
