@@ -28,6 +28,7 @@ from PyQt4.QtGui import *
 from onmap_loader_dialog import OnMapLoaderDialog
 import os.path
 import webbrowser
+from osgeo import gdal, ogr
 
 
 class OnMapLoader:
@@ -36,11 +37,16 @@ class OnMapLoader:
     def __init__(self, iface):
         """Constructor.
 
+
         :param iface: An interface instance that will be passed to this class
             which provides the hook by which you can manipulate the QGIS
             application at run time.
         :type iface: QgsInterface
         """
+        checkMsg = self.checkGdal()
+        if checkMsg is not None:
+            raise Exception(checkMsg)
+
         # Save reference to the QGIS interface
         self.iface = iface
         # initialize plugin directory
@@ -66,6 +72,15 @@ class OnMapLoader:
         # TODO: We are going to let the user set this up in a future iteration
         self.toolbar = self.iface.addToolBar(u'OnMapLoader')
         self.toolbar.setObjectName(u'OnMapLoader')
+
+    def checkGdal(self):
+        if gdal.VersionInfo() < "2000000":
+            return u"죄송합니다. GDAL 버전이 낮아 실행 불가능합니다.\nGDAL 2.0 이상이 필요합니다."
+        if not ogr.GetDriverByName("PDF"):
+            return u"죄송합니다. 설치된 GDAL이 PDF를 지원하지 않아 실행 불가능합니다."
+        if not ogr.GetDriverByName("GPKG"):
+            return u"죄송합니다. 설치된 GDAL이 GeoPackage를 지원하지 않아 실행 불가능합니다."
+        return None
 
 
     # noinspection PyMethodMayBeStatic

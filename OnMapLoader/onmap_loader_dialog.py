@@ -311,7 +311,7 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
     def __init__(self, iface, parent=None):
         """Constructor."""
         super(OnMapLoaderDialog, self).__init__(parent)
-        # self.configFile = os.path.join(os.path.dirname(__file__), 'onmap_loader.ini')
+
         self.configFile = os.path.join(QgsApplication.qgisSettingsDirPath(), 'onmap_loader.ini')
         self.setupUi(self)
         self.edtSrcFile.setFocus()
@@ -890,9 +890,7 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
         driver = ogr.GetDriverByName("GPKG")
         # opening the FileGDB
         try:
-            gpkg = gdal.OpenEx(self.gpkgPath, gdal.OF_ALL)
-            if gpkg is None:
-                gpkg = driver.CreateDataSource(self.gpkgPath)
+            gpkg = driver.CreateDataSource(self.gpkgPath)
         except Exception, e:
             self.error(unicode(e))
             return

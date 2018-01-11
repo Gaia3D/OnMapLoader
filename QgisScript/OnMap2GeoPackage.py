@@ -646,9 +646,7 @@ def createGeoPackage(gpkgFilePath):
     driver = ogr.GetDriverByName("GPKG")
     # opening the FileGDB
     try:
-        gpkg = gdal.OpenEx(gpkgFilePath, gdal.OF_ALL)
-        if gpkg is None:
-            gpkg = driver.CreateDataSource(gpkgFilePath)
+        gpkg = driver.CreateDataSource(gpkgFilePath)
     except Exception, e:
         print e
 
