@@ -27,7 +27,8 @@ from PyQt4.QtGui import *
 try:
     from PIL import Image
 except:
-    raise Exception(u"죄송합니다. PIL 라이브러리가 없어 실행할 수 없습니다.\nhttp://www.kyngchaos.com/software/python 에서 PIL을 설치하실 수 있습니다.")
+    # raise Exception(u"죄송합니다. PIL 라이브러리가 없어 실행할 수 없습니다.\nhttp://www.kyngchaos.com/software/python 에서 PIL을 설치하실 수 있습니다.")
+    raise Exception(tr(u"Sorry. Can not run this plugin because there is no PIL library.\nYou can install PIL from http://www.kyngchaos.com/software/python."))
 
 # Import the code for the dialog
 from onmap_loader_dialog import OnMapLoaderDialog
@@ -35,6 +36,10 @@ import os.path
 import os
 import webbrowser
 from osgeo import gdal, ogr
+
+
+def tr(message):
+    return QCoreApplication.translate('OnMapLoader', message)
 
 
 class OnMapLoader:
@@ -74,39 +79,44 @@ class OnMapLoader:
 
         # Declare instance attributes
         self.actions = []
-        self.menu = self.tr(u'&OnMap Loader')
+        # self.menu = self.tr(u'&OnMap Loader')
+        self.menu = tr(u'&OnMap Loader')
         # TODO: We are going to let the user set this up in a future iteration
         self.toolbar = self.iface.addToolBar(u'OnMapLoader')
         self.toolbar.setObjectName(u'OnMapLoader')
 
     def checkGdal(self):
         if gdal.VersionInfo() < "2000000":
-            return u"죄송합니다. GDAL 버전이 낮아 실행 불가능합니다.\nGDAL 2.0 이상이 필요합니다."
+            # return u"죄송합니다. GDAL 버전이 낮아 실행 불가능합니다.\nGDAL 2.0 이상이 필요합니다."
+            return tr(u"Sorry. The GDAL version is low and can not run this plugin.\nGDAL 2.0 or higher is required.")
         if not ogr.GetDriverByName("PDF"):
-            msg = u"죄송합니다. 설치된 GDAL이 PDF를 지원하지 않아 실행 불가능합니다."
+            # msg = u"죄송합니다. 설치된 GDAL이 PDF를 지원하지 않아 실행 불가능합니다."
+            msg = tr(u"Sorry. Can not run this plugin because installed GDAL not support PDF.")
             if os.name == "posix":
-                msg += u"\n다음 경로에서 GeoPDF Plugin을 받아 설치후 다시 실행해 주십시오."
+                # msg += u"\n다음 경로에서 GeoPDF Plugin을 받아 설치후 다시 실행해 주십시오."
+                msg += tr(u"\nPlease acquire GeoPDF Plugin from the following path and install it again.")
                 msg += u"\nhttp://www.kyngchaos.com/files/software/frameworks/GDAL-GeoPDF_Plugin-2.1.1-1.dmg"
             return msg
         if not ogr.GetDriverByName("GPKG"):
-            return u"죄송합니다. 설치된 GDAL이 GeoPackage를 지원하지 않아 실행 불가능합니다."
+            # return u"죄송합니다. 설치된 GDAL이 GeoPackage를 지원하지 않아 실행 불가능합니다."
+            return tr(u"Sorry. Can not run this plugin because installed GDAL not support GeoPackage.")
         return None
 
 
     # noinspection PyMethodMayBeStatic
-    def tr(self, message):
-        """Get the translation for a string using Qt translation API.
-
-        We implement this ourselves since we do not inherit QObject.
-
-        :param message: String for translation.
-        :type message: str, QString
-
-        :returns: Translated version of message.
-        :rtype: QString
-        """
-        # noinspection PyTypeChecker,PyArgumentList,PyCallByClass
-        return QCoreApplication.translate('OnMapLoader', message)
+    # def tr(self, message):
+    #     """Get the translation for a string using Qt translation API.
+    #
+    #     We implement this ourselves since we do not inherit QObject.
+    #
+    #     :param message: String for translation.
+    #     :type message: str, QString
+    #
+    #     :returns: Translated version of message.
+    #     :rtype: QString
+    #     """
+    #     # noinspection PyTypeChecker,PyArgumentList,PyCallByClass
+    #     return QCoreApplication.translate('OnMapLoader', message)
 
     def add_action(
         self,
@@ -188,13 +198,15 @@ class OnMapLoader:
         self.add_action(
             icon_path,
             # text=self.tr('NGII 온맵(On-Map) 로더'),
-            text=u'NGII 온맵(On-Map) 로더 ',
+            # text=u'NGII 온맵(On-Map) 로더 ',
+            text=tr(u'NGII On-Map Loader'),
             callback=self.run,
             parent=self.iface.mainWindow())
         icon_path = os.path.dirname(__file__) + "/help.png"
         self.add_action(
             icon_path,
-            text=self.tr('Help'),
+            # text=self.tr('Help'),
+            text=tr('Help'),
             callback=self.help,
             parent=self.iface.mainWindow())
 
