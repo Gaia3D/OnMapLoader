@@ -24,6 +24,10 @@ from PyQt4.QtCore import QSettings, QTranslator, qVersion, QCoreApplication
 from PyQt4.QtGui import QAction, QIcon
 from PyQt4.QtGui import *
 
+
+def tr(message):
+    return QCoreApplication.translate('@default', message)
+
 try:
     from PIL import Image
 except:
@@ -36,10 +40,6 @@ import os.path
 import os
 import webbrowser
 from osgeo import gdal, ogr
-
-
-def tr(message):
-    return QCoreApplication.translate('OnMapLoader', message)
 
 
 class OnMapLoader:
@@ -104,19 +104,8 @@ class OnMapLoader:
 
 
     # noinspection PyMethodMayBeStatic
-    # def tr(self, message):
-    #     """Get the translation for a string using Qt translation API.
-    #
-    #     We implement this ourselves since we do not inherit QObject.
-    #
-    #     :param message: String for translation.
-    #     :type message: str, QString
-    #
-    #     :returns: Translated version of message.
-    #     :rtype: QString
-    #     """
-    #     # noinspection PyTypeChecker,PyArgumentList,PyCallByClass
-    #     return QCoreApplication.translate('OnMapLoader', message)
+    def tr(self, message):
+        return QCoreApplication.translate('OnMapLoader', message)
 
     def add_action(
         self,
@@ -197,16 +186,15 @@ class OnMapLoader:
         icon_path = os.path.dirname(__file__) + "/icon.png"
         self.add_action(
             icon_path,
-            # text=self.tr('NGII 온맵(On-Map) 로더'),
-            # text=u'NGII 온맵(On-Map) 로더 ',
-            text=tr(u'NGII On-Map Loader'),
+            # text=u'NGII 온맵(OnMap) 로더 ',
+            text=self.tr('NGII OnMap Loader'),
             callback=self.run,
             parent=self.iface.mainWindow())
         icon_path = os.path.dirname(__file__) + "/help.png"
         self.add_action(
             icon_path,
-            # text=self.tr('Help'),
-            text=tr('Help'),
+            # text=u'도움말',
+            text=self.tr('Help'),
             callback=self.help,
             parent=self.iface.mainWindow())
 
@@ -214,7 +202,8 @@ class OnMapLoader:
         """Removes the plugin menu item and icon from QGIS GUI."""
         for action in self.actions:
             self.iface.removePluginMenu(
-                self.tr(u'&OnMap Loader'),
+                # self.tr(u'온맵 로더(&O)'),
+                self.tr('&OnMap Loader'),
                 action)
             self.iface.removeToolBarIcon(action)
         # remove the toolbar

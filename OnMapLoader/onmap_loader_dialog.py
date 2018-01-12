@@ -46,6 +46,11 @@ from PyPDF2.pdf import *
 from PIL import Image
 from io import BytesIO
 
+
+def tr(message):
+    return QCoreApplication.translate('OnMapLoader', message)
+
+
 # 기본 설정값
 LAYER_FILTER = re.compile(u"^지도정보_")
 MAP_BOX_LAYER = u"지도정보_도곽"
@@ -179,14 +184,7 @@ def findConner(points):
 
 
 def findMapNo(fileBase):
-    # MAP_NO_FILTER = re.compile(u".*온맵_(.*)$")
-    # res = MAP_NO_FILTER.search(fileBase)
-    # if res:
-    #     return os.path.splitext(res.group(1))[0]
-    # else:
-    #     return None
-    # 맥의 한글 문제 해결 위해 추가
-    res = re.search(u"(?i).*_(.*)\.pdf$", fileBase)
+    res = re.search("(?i).*_(.*)\.pdf$", fileBase)
     if res:
         return res.group(1)
     else:
@@ -209,7 +207,8 @@ def mapNoToMapBox(mapNo):
         return None
 
     if scale == 250000:
-        raise NotImplementedError(u"죄송합니다.25만 도엽은 지원되지 않습니다.")
+        # raise NotImplementedError(u"죄송합니다.25만 도엽은 지원되지 않습니다.")
+        raise NotImplementedError(tr("Sorry, 250k scale map boxes are not supported."))
         return None
 
         try:
@@ -314,13 +313,18 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
 
         self.configFile = os.path.join(QgsApplication.qgisSettingsDirPath(), 'onmap_loader.ini')
         self.setupUi(self)
+        self._set_ui_text()
         self.edtSrcFile.setFocus()
         self.iface = iface
         self._connect_action()
         self.readConfig()
-        self.order(u"변환할 온맵(PDF)이나 이전에 변환된 지오패키지(GPKG)를 선택해 주세요.")
+        # self.order(u"변환할 온맵(PDF)이나 이전에 변환된 지오패키지(GPKG)를 선택해 주세요.")
+        self.order(self.tr("Please select an OnMap (*.pdf) to convert or a previously converted GeoPackage (*.gpkg)."))
         # 중지 기능 구현 실패로 일단 안보이게
         self.btnStop.hide()
+
+    def tr(self, message):
+        return QCoreApplication.translate('OnMapLoaderDialog', message)
 
     def error(self, msg):
         self.editLog.appendHtml(u'<font color="red"><b>{}</b></font>'.format(msg))
@@ -338,6 +342,29 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
     def order(self, msg):
         self.editLog.appendHtml(u'<font color="blue"><b>{}</b></font>'.format(msg))
 
+    def _set_ui_text(self):
+        # self.setWindowTitle(u"온맵(지리원 PDF 지도) 로더")
+        self.setWindowTitle(self.tr("OnMap(NGII PDF map) Loader"))
+        # self.lblMainWork.setText(self.tr("전체 작업 진행상황"))
+        self.lblMainWork.setText(self.tr("Overall work progress"))
+        # self.lblSubWork.setText(self.tr("현재 작업 진행상황"))
+        self.lblSubWork.setText(self.tr("Current work progress"))
+        # self.lblTgtFile.setText(self.tr("변환된 공간정보가 저장될 지오패키지(GPKG) 파일:"))
+        self.lblTgtFile.setText(self.tr("GeoPackage(GPKG) file for store converted information:"))
+        # self.btnTgtFile.setText(self.tr("선택..."))
+        self.btnTgtFile.setText(self.tr("Browse..."))
+        # self.btnStop.setText(self.tr("작업중지"))
+        self.btnStop.setText(self.tr("Abort working"))
+        # self.btnStart.setText(self.tr("온맵 변환 시작"))
+        self.btnStart.setText(self.tr("Start OnMap conversion"))
+        # self.lblSrcFile.setText(self.tr("변환대상 온맵(PDF) 파일:"))
+        self.lblSrcFile.setText(self.tr("Conversion target OnMap(PDF) file:"))
+        # self.btnSrcFile.setText(self.tr("선택..."))
+        self.btnSrcFile.setText(self.tr("Browse..."))
+        # self.lblSelLayer.setText(self.tr("가져올 레이어 선택:"))
+        self.lblSelLayer.setText(self.tr("Select layer to import:"))
+
+
     def _connect_action(self):
         self.connect(self.btnSrcFile, SIGNAL("clicked()"), self._on_click_btnSrcFile)
         self.connect(self.btnTgtFile, SIGNAL("clicked()"), self._on_click_btnTgtFile)
@@ -346,8 +373,10 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
 
     def _on_click_btnSrcFile(self):
         qfd = QFileDialog()
-        title = u"온맵(PDF) 파일 열기"
-        ext = u"온맵(*.pdf)"
+        # title = u"온맵(PDF) 파일 열기"
+        title = tr("Open OnMap(PDF) file")
+        # ext = u"온맵(*.pdf)"
+        ext = tr("OnMap(*.pdf)")
         pdfPath = os.path.dirname(self.pdfPath)
         path = QFileDialog.getOpenFileName(qfd, caption=title, directory=pdfPath, filter=ext)
 
@@ -363,42 +392,56 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
         # GPKG가 존재하면 재사용 확인
         rc = None
         if os.path.exists(self.gpkgPath):
-            rc = QMessageBox.question(self, u"GeoPackage 재활용",
-                                      u"이미 지오패키지 파일이 있습니다.\n"
-                                      u"다시 변환하지 않고 이 파일을 이용할까요?\n\n"
-                                      u"[예]를 누르면 변환을 생략하고 더 빨리 열 수 있습니다.\n"
-                                      u"[아니오]를 누르면 지오패키지 파일을 다시 생성합니다.",
+            # rc = QMessageBox.question(self, u"GeoPackage 재활용 여부 확인",
+            #                           u"이미 지오패키지 파일이 있습니다.\n"
+            #                           u"다시 변환하지 않고 이 파일을 이용할까요?\n\n"
+            #                           u"[예]를 누르면 변환을 생략하고 더 빨리 열 수 있습니다.\n"
+            #                           u"[아니오]를 누르면 지오패키지 파일을 다시 생성합니다.",
+            #                           QMessageBox.Yes | QMessageBox.No)
+            rc = QMessageBox.question(self, self.tr("Recycle GeoPackage?"),
+                                      self.tr("You already have a GeoPackage file.\n"
+                                              "Do you want to use this file without converting it again?\n\n"
+                                              "If you click [Yes], you can omit the conversion and open it faster.\n"
+                                              "Click [No] to regenerate the geo-package file."),
                                       QMessageBox.Yes | QMessageBox.No)
 
         if rc != QMessageBox.Yes:
             # PDF에서 읽는 경우
             self.readMode = "PDF"
-            self.btnStart.setText(u"온맵 변환 시작")
+            # self.btnStart.setText(u"온맵 변환 시작")
+            self.btnStart.setText(self.tr("Convert OnMap"))
             rc = self.fillLayerTreeFromPdf()
             if not rc:
-                self.error(u"온맵(PDF) 파일에서 지리정보를 추출하지 못했습니다. 온맵이 아닌 듯 합니다.")
+                # self.error(u"온맵(PDF) 파일에서 지리정보를 추출하지 못했습니다. 온맵이 아닌 듯 합니다.")
+                self.error(self.tr("Failed to extract geographic information from OnMap(PDF) file. It does not seem to be OnMap."))
                 return
 
-            self.order(u"레이어를 선택하고 [온맵 변환 시작] 버튼을 눌러주세요.")
+            # self.order(u"레이어를 선택하고 [온맵 변환 시작] 버튼을 눌러주세요.")
+            self.order(tr("Select the layer and press the [Convert OnMap] button."))
             self.btnStart.setEnabled(True)
         else:
             # GPKG에서 읽는 경우
             self.readMode = "GPKG"
-            self.btnStart.setText(u"지오패키지 읽기 시작")
+            # self.btnStart.setText(u"지오패키지 읽기 시작")
+            self.btnStart.setText(self.tr("Read GeoPackage"))
             rc = self.fillLayerTreeFromGpkg()
             if not rc:
-                self.error(u"지오패키지(GPKG) 파일에서 레이어 정보를 읽지 못했습니다.")
+                # self.error(u"지오패키지(GPKG) 파일에서 레이어 정보를 읽지 못했습니다.")
+                self.error(tr("Failed to read layer information from GeoPackage(GPKG) file."))
                 return
 
-            self.order(u"레이어를 선택하고 [지오패키지 읽기 시작] 버튼을 눌러주세요.")
+            # self.order(u"레이어를 선택하고 [지오패키지 읽기 시작] 버튼을 눌러주세요.")
+            self.order(self.tr("Select the layer and press the [Read GeoPackage] button."))
             self.btnStart.setEnabled(True)
 
         self.writeConfig()
 
     def _on_click_btnTgtFile(self):
         qfd = QFileDialog()
-        title = u"생생될 지오패키지(GPKG) 파일 선택"
-        ext = u"지오패키지(*.gpkg)"
+        # title = u"생생될 지오패키지(GPKG) 파일 선택"
+        title = self.tr("Select a target GeoPackage(GPKG) file")
+        # ext = u"지오패키지(*.gpkg)"
+        ext = self.tr("GeoPackage(*.gpkg)")
         gpkgPath = os.path.dirname(self.gpkgPath)
         path = QFileDialog.getOpenFileName(qfd, caption=title, directory=gpkgPath, filter=ext)
 
@@ -408,13 +451,16 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
         self.edtTgtFile.setText(self.gpkgPath)
 
         self.readMode = "GPKG"
-        self.btnStart.setText(u"지오패키지 읽기 시작")
+        # self.btnStart.setText(u"지오패키지 읽기 시작")
+        self.btnStart.setText(self.tr("Read GeoPackage"))
         rc = self.fillLayerTreeFromGpkg()
         if not rc:
-            self.error(u"지오패키지(GPKG) 파일에서 레이어 정보를 읽지 못했습니다.")
+            # self.error(u"지오패키지(GPKG) 파일에서 레이어 정보를 읽지 못했습니다.")
+            self.error(self.tr("Failed to read layer information from GeoPackage(GPKG) file."))
             return
 
-        self.order(u"레이어를 선택하고 [지오패키지 읽기 시작] 버튼을 눌러주세요.")
+        # self.order(u"레이어를 선택하고 [지오패키지 읽기 시작] 버튼을 눌러주세요.")
+        self.order(self.tr("Select the layer and press the [Read GeoPackage] button."))
         self.btnStart.setEnabled(True)
 
         self.writeConfig()
@@ -440,28 +486,33 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
             selectedVectorLayerList = list()
             self.getSelectedLayerList(selectedRasterLayerList, selectedVectorLayerList)
             if len(selectedRasterLayerList) + len(selectedVectorLayerList) == 0:
-                self.error(u"선택된 레이어가 하나도 없어 진행할 수 없습니다.")
+                # self.error(u"선택된 레이어가 하나도 없어 진행할 수 없습니다.")
+                self.error(self.tr("You can not proceed because there are no selected layers."))
                 raise Exception()
 
             if self.readMode == "PDF":
                 if not os.path.exists(self.pdfPath):
-                    raise Exception(u"선택한 온맵(PDF) 파일이 존재하지 않습니다.")
+                    # raise Exception(u"선택한 온맵(PDF) 파일이 존재하지 않습니다.")
+                    raise Exception(self.tr("The selected OnMap(PDF) file does not exist."))
 
                 if not self.pdf:
                     rc = self.fillLayerTreeFromPdf()
                     if not rc:
-                        raise Exception(u"온맵(PDF) 파일에서 지리정보를 찾지 못했습니다.")
+                        # raise Exception(u"온맵(PDF) 파일에서 지리정보를 찾지 못했습니다.")
+                        raise Exception(self.tr("Geographic information was not found in the OnMap(PDF) file."))
 
                 rc = self.createGeoPackage()
                 if not rc:
-                    raise Exception(u"지오패키지(GPKG) 파일을 만들지 못했습니다.")
+                    # raise Exception(u"지오패키지(GPKG) 파일을 만들지 못했습니다.")
+                    raise Exception(self.tr("Failed to create GeoPackage(GPKG) file."))
 
                 self.importPdfVector(selectedVectorLayerList)
                 if self.forceStop:
                     raise StoppedByUserException()
 
                 try:
-                    selectedRasterLayerList.index(u"영상")
+                    # selectedRasterLayerList.index(u"영상")
+                    selectedRasterLayerList.index(self.tr("PHOTO"))
                 except ValueError:
                     pass
                 else:
@@ -478,7 +529,8 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
             canvas = self.iface.mapCanvas()
             canvas.setExtent(canvas.mapSettings().fullExtent())
             canvas.refresh()
-            self.info(u"온맵 불러오기 성공!")
+            # self.info(u"온맵 불러오기 성공!")
+            self.info(self.tr("Importing OnMap succeeded!"))
 
             self.isOnProcessing = False
             self.close()
@@ -503,9 +555,13 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
         if not self.isOnProcessing:
             return False
 
-        rc = QMessageBox.question(self, u"작업 강제 중지",
-                                  u"현재 작업을 강제로 중지하시겠습니까?\n\n"
-                                  u"작업 중지는 오류의 원인이 될 수도 있습니다.",
+        # rc = QMessageBox.question(self, u"작업 강제 중지",
+        #                           u"현재 작업을 강제로 중지하시겠습니까?\n\n"
+        #                           u"작업 중지는 오류의 원인이 될 수도 있습니다.",
+        #                           QMessageBox.Yes | QMessageBox.No)
+        rc = QMessageBox.question(self, self.tr("Forcibly stop work"),
+                                  self.tr("Are you sure want to force the current task to stop?\n\n"
+                                  "Forcibly stop can also cause errors."),
                                   QMessageBox.Yes | QMessageBox.No)
         if rc != QMessageBox.Yes:
             return False
@@ -561,15 +617,18 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
             self.pdfPath = self.edtSrcFile.text()
             rc =  self.getPdfInformation()
             if not rc:
-                self.error(u"PDF 파일에서 정보를 추출하지 못했습니다. 온맵 PDF가 아닌 듯 합니다.")
+                # self.error(u"PDF 파일에서 정보를 추출하지 못했습니다. 온맵 PDF가 아닌 듯 합니다.")
+                self.error(self.tr("Failed to extract information from PDF file. It does not seem to be an on-map PDF."))
                 raise Exception()
 
             self.treeLayer.clear()
             parentList = dict()
             parentList[0] = self.treeLayer
             # 영상 추가
-            item = addTreeItem(parentList[0], u"영상")
-            item.layerName = u"영상"
+            # item = addTreeItem(parentList[0], u"영상")
+            item = addTreeItem(parentList[0], self.tr("PHOTO"))
+            # item.layerName = u"영상"
+            item.layerName = self.tr("PHOTO")
             item.layerId = -1
 
             titleList = dict()
@@ -624,7 +683,8 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
 
             rc =  self.getGpkgInformation()
             if not rc:
-                self.error(u"GPKG 파일에서 정보를 추출하지 못했습니다.")
+                # self.error(u"GPKG 파일에서 정보를 추출하지 못했습니다.")
+                self.error(self.tr("Failed to extract information from GPKG file."))
                 raise Exception()
 
             parentList = dict()
@@ -673,8 +733,10 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
     def getPdfInformation(self):
         self.progressMainWork.setMinimum(0)
         self.progressMainWork.setMaximum(0)
-        self.lblMainWork.setText(u"선택한 온맵 파일 분석중...")
-        self.info(u"PDF 파일에서 정보추출 시작...")
+        # self.lblMainWork.setText(u"선택한 온맵 파일 분석중...")
+        self.lblMainWork.setText(self.tr("Analyzing selected OnMap file..."))
+        # self.info(u"PDF 파일에서 정보추출 시작...")
+        self.info(self.tr("Start extracting information from PDF files..."))
         force_gui_update()
 
         mapNo = findMapNo(os.path.basename(self.pdfPath))
@@ -686,7 +748,8 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
         except NotImplementedError as e:
             self.error(repr(e))
         except:
-            self.error(u"해석할 수 없는 도엽명이어서 중단됩니다.")
+            # self.error(u"해석할 수 없는 도엽명이어서 중단됩니다.")
+            self.error(self.tr("The map name can not be interpreted, so it will stop."))
             return
 
         # get the driver
@@ -796,8 +859,10 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
         srcNpArray = np.array(srcList, dtype=np.float32)
         tgtNpArray = affineTransform(srcNpArray)
 
-        self.info(u"정보추출 완료.")
-        self.lblMainWork.setText(u"작업 대기중")
+        # self.info(u"정보추출 완료.")
+        self.info(self.tr("Information extraction completed."))
+        # self.lblMainWork.setText(u"작업 대기중")
+        self.lblMainWork.setText(self.tr("Waiting for work"))
         self.progressMainWork.setMinimum(0)
         self.progressMainWork.setMaximum(100)
 
@@ -815,8 +880,10 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
     def getGpkgInformation(self):
         self.progressMainWork.setMinimum(0)
         self.progressMainWork.setMaximum(0)
-        self.lblMainWork.setText(u"선택한 지오패키지 파일 분석중...")
-        self.info(u"GPKG 파일에서 정보추출 시작...")
+        # self.lblMainWork.setText(u"선택한 지오패키지 파일 분석중...")
+        self.lblMainWork.setText(self.tr("Analyzing the selected GeoPackage file..."))
+        # self.info(u"GPKG 파일에서 정보추출 시작...")
+        self.info(self.tr("Start extracting information from GPKG file..."))
         force_gui_update()
 
         rc = False
@@ -826,7 +893,8 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
             gpkg = None
             gpkg = gdal.OpenEx(self.gpkgPath)
             if not gpkg:
-                raise Exception(u"지오패키지 열기 오류")
+                # raise Exception(u"지오패키지 열기 오류")
+                raise Exception(self.tr("Open GeoPackage Error"))
 
             # 영상이 있는지 확인
             resSet = gpkg.ExecuteSQL("SELECT table_name from gpkg_contents where data_type = 'tiles'")
@@ -851,9 +919,11 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
         self.progressMainWork.setMinimum(0)
         self.progressMainWork.setMaximum(100)
         self.progressMainWork.setValue(0)
-        self.lblMainWork.setText(u"지오패키지 정보추출 완료")
+        # self.lblMainWork.setText(u"지오패키지 정보추출 완료")
+        self.lblMainWork.setText(self.tr("GeoPackage information extraction complete"))
         if rc:
-            self.info(u"GPKG 파일에서 정보추출 완료")
+            # self.info(u"지오패키지 정보추출 완료")
+            self.info(self.tr("GeoPackage information extraction complete"))
 
         return rc
 
@@ -884,7 +954,8 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
             if os.path.isfile(self.gpkgPath):
                 os.remove(self.gpkgPath)
         except Exception, e:
-            self.error(u"{} 파일을 다시 만들 수 없습니다. 아마 사용중인 듯 합니다.".format(self.gpkgPath))
+            # self.error(u"{} 파일을 다시 만들 수 없습니다. 아마 사용중인 듯 합니다.".format(self.gpkgPath))
+            self.error(self.tr(u"Unable to recreate {} file. Maybe you are using it.")).format(self.gpkgPath)
             return
 
         driver = ogr.GetDriverByName("GPKG")
@@ -901,7 +972,8 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
     def importPdfVector(self, selectedLayerList):
         QgsApplication.setOverrideCursor(Qt.WaitCursor)
         try:
-            self.info (u"PDF에서 벡터정보 추출 시작...")
+            # self.info (u"PDF에서 벡터정보 추출 시작...")
+            self.info (self.tr("Start extracting vector information from PDF..."))
             createdLayerName = []
 
             # 좌표계 정보 생성
@@ -921,7 +993,8 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
 
                 crrIndex += 1
                 self.progressMainWork.setValue(crrIndex)
-                self.lblMainWork.setText(u"{} 레이어 처리중({}/{})...".format(layerName, crrIndex, totalCount))
+                # self.lblMainWork.setText(u"{} 레이어 처리중({}/{})...".format(layerName, crrIndex, totalCount))
+                self.lblMainWork.setText(self.tr(u"Processing {} layer({}/{})...").format(layerName, crrIndex, totalCount))
 
                 # 선택된 레이어만 가져오기
                 try:
@@ -944,7 +1017,8 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
                     if crrPct != oldPct:
                         oldPct = crrPct
                         self.progressSubWork.setValue(crrPct)
-                        self.lblSubWork.setText(u"객체 추출중 ({}/{})...".format(crrFeatureIndex, totalFeature))
+                        # self.lblSubWork.setText(u"객체 추출중 ({}/{})...".format(crrFeatureIndex, totalFeature))
+                        self.lblSubWork.setText(self.tr(u"Extracting object ({}/{})...").format(crrFeatureIndex, totalFeature))
                     force_gui_update()
 
                     if self.forceStop:
@@ -1020,14 +1094,17 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
                     vLayer.CreateFeature(feature)
                     feature = None
 
-            self.info(u"벡터 가져오기 완료")
+            # self.info(u"벡터 가져오기 완료")
+            self.info(self.tr("Vector import complete"))
         except StoppedByUserException:
-            self.error(u"사용자에 의해 중지됨")
+            # self.error(u"사용자에 의해 중지됨")
+            self.error(self.tr("Suspended by user"))
             QgsApplication.restoreOverrideCursor()
             return False
         except Exception as e:
             self.error(e)
-            self.error(u"벡터 가져오기 실패")
+            # self.error(u"벡터 가져오기 실패")
+            self.error(self.tr("Vector import failed"))
             QgsApplication.restoreOverrideCursor()
             return False
 
@@ -1037,7 +1114,8 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
     def importPdfRaster(self):
         QgsApplication.setOverrideCursor(Qt.WaitCursor)
         try:
-            self.info(u"영상 정보 추출시작")
+            # self.info(u"영상 정보 추출시작")
+            self.info(self.tr("Start extracting photo information"))
             self.progressMainWork.setMinimum(0)
             self.progressMainWork.setMaximum(4)
 
@@ -1049,10 +1127,12 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
             try:
                 xObject = pageObj['/Resources']['/XObject'].getObject()
             except KeyError:
-                raise Exception(u"영상 레이어가 없어 가져올 수 없습니다.")
+                # raise Exception(u"영상 레이어가 없어 가져올 수 없습니다.")
+                raise Exception(self.tr("Can not import because there is no photo layer."))
 
             self.progressMainWork.setValue(1)
-            self.lblMainWork.setText(u"영상 조각 추출중...")
+            # self.lblMainWork.setText(u"영상 조각 추출중...")
+            self.lblMainWork.setText(self.tr("Extracting photo fragments..."))
             if self.forceStop:
                 raise StoppedByUserException()
 
@@ -1065,7 +1145,8 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
             for obj in xObject:
                 crrIndex += 1
                 self.progressSubWork.setValue(crrIndex)
-                self.lblSubWork.setText(u"영상 조각 처리중({}/{})...".format(crrIndex, totalCount))
+                # self.lblSubWork.setText(u"영상 조각 처리중({}/{})...".format(crrIndex, totalCount))
+                self.lblSubWork.setText(self.tr("Photo fragments processing({}/{})...").format(crrIndex, totalCount))
                 force_gui_update()
                 if self.forceStop:
                     raise StoppedByUserException()
@@ -1159,9 +1240,11 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
             del pdfObj
 
             # 이미지를 ID 순으로 연결
-            self.info(u"영상 병합 시작")
+            # self.info(u"영상 병합 시작")
+            self.info(self.tr("Start merging photo"))
             self.progressMainWork.setValue(2)
-            self.lblMainWork.setText(u"영상 병합중...")
+            # self.lblMainWork.setText(u"영상 병합중...")
+            self.lblMainWork.setText(self.tr("Merging photo fragments..."))
             if self.forceStop:
                 raise StoppedByUserException()
 
@@ -1179,7 +1262,8 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
             for key in keys:
                 crrIndex += 1
                 self.progressSubWork.setValue(crrIndex)
-                self.lblSubWork.setText(u"영상 조각 처리중({}/{})...".format(crrIndex, totalCount))
+                # self.lblSubWork.setText(u"영상 조각 처리중({}/{})...".format(crrIndex, totalCount))
+                self.lblSubWork.setText(self.tr("Processing photo fragments({}/{})...").format(crrIndex, totalCount))
                 force_gui_update()
                 if self.forceStop:
                     raise StoppedByUserException()
@@ -1208,16 +1292,19 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
 
             images.clear()
 
-            self.info(u"병합된 영상을 지오패키지에 저장 시작")
+            # self.info(u"병합된 영상을 지오패키지에 저장 시작")
+            self.info(self.tr("Start saving merged photo into GeoPackage"))
             self.progressMainWork.setValue(3)
-            self.lblMainWork.setText(u"병합된 영상 저장중...")
+            # self.lblMainWork.setText(u"병합된 영상 저장중...")
+            self.lblMainWork.setText(self.tr("Saving merged photo..."))
             if self.forceStop:
                 raise StoppedByUserException()
 
             self.progressSubWork.setMinimum(0)
             self.progressSubWork.setMaximum(5)
             self.progressSubWork.setValue(0)
-            self.lblSubWork.setText(u"영상 저장중...")
+            # self.lblSubWork.setText(u"영상 저장중...")
+            self.lblSubWork.setText(self.tr("Saving photo..."))
             if self.forceStop:
                 raise StoppedByUserException()
 
@@ -1247,7 +1334,8 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
                 mergedHeight,
                 3,
                 gdal.GDT_Byte,
-                options=["APPEND_SUBDATASET=YES", u"RASTER_TABLE=영상", "TILE_FORMAT=JPEG"]
+                # options=["APPEND_SUBDATASET=YES", u"RASTER_TABLE=영상", "TILE_FORMAT=JPEG"]
+                options=["APPEND_SUBDATASET=YES", self.tr("RASTER_TABLE=PHOTO"), "TILE_FORMAT=JPEG"]
             )
 
             dataset.SetProjection(crs_wkt)
@@ -1299,17 +1387,21 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
 
         except StoppedByUserException:
             QgsApplication.restoreOverrideCursor()
-            self.error(u"사용자에 의해 중지됨")
+            # self.error(u"사용자에 의해 중지됨")
+            self.error(self.tr("Suspended by user"))
             return False
         except Exception as e:
             self.error(e)
             QgsApplication.restoreOverrideCursor()
-            self.error(u"영상 가져오기 실패")
+            # self.error(u"영상 가져오기 실패")
+            self.error(self.tr("Photo import failed"))
             return False
 
         QgsApplication.restoreOverrideCursor()
-        self.lblMainWork.setText(u"영상 처리 완료")
-        self.info(u"영상 가져오기 완료")
+        # self.lblMainWork.setText(u"영상 처리 완료")
+        self.lblMainWork.setText(self.tr("Photo processing completed"))
+        # self.info(u"영상 가져오기 완료")
+        self.info(self.tr("Photo import completed"))
         return True
 
     def openGeoPackage(self, selectedRasterLayerList, selectedVectorLayerList):
@@ -1319,13 +1411,16 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
             if self.readMode == "PDF":
                 # 래스터 로딩
                 try:
-                    selectedRasterLayerList.index(u"영상")
+                    # selectedRasterLayerList.index(u"영상")
+                    selectedRasterLayerList.index(self.tr("PHOTO"))
                     try:
-                        layer = self.iface.addRasterLayer(self.gpkgPath, u"영상", "gdal")
+                        # layer = self.iface.addRasterLayer(self.gpkgPath, u"영상", "gdal")
+                        layer = self.iface.addRasterLayer(self.gpkgPath, self.tr("PHOTO"), "gdal")
                     except:
                         layer = None
                     if not layer:
-                        self.error(u"영상 레이어 읽기 실패")
+                        # self.error(u"영상 레이어 읽기 실패")
+                        self.error(self.tr("Photo layer load failed"))
                 except ValueError:
                     pass
 
@@ -1340,8 +1435,10 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
                     iLayer = 0
                     self.progressMainWork.setMinimum(0)
                     self.progressMainWork.setMaximum(numLayer)
-                    self.lblMainWork.setText(u"변환된 지오패키지 읽는 중...")
-                    self.info(u"지오패키지 불러오기 시작")
+                    # self.lblMainWork.setText(u"변환된 지오패키지 읽는 중...")
+                    self.lblMainWork.setText(self.tr("Loading the converted GeoPackage..."))
+                    # self.info(u"지오패키지 불러오기 시작")
+                    self.info(self.tr("Starting GeoPackage loading"))
                     self.progressSubWork.setMinimum(0)
                     self.progressSubWork.setMaximum(numLayer)
 
@@ -1349,7 +1446,8 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
                         iLayer += 1
                         self.progressMainWork.setValue(iLayer)
                         self.progressSubWork.setValue(iLayer)
-                        self.lblSubWork.setText(u"벡터 레이어 읽는 중({}/{})...".format(iLayer, numLayer))
+                        # self.lblSubWork.setText(u"벡터 레이어 읽는 중({}/{})...".format(iLayer, numLayer))
+                        self.lblSubWork.setText(self.tr("Reading vector layer({}/{})...").format(iLayer, numLayer))
                         force_gui_update()
                         if self.forceStop:
                             raise StoppedByUserException()
@@ -1375,7 +1473,8 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
                             layer = None
 
                         if not layer:
-                            self.error(u"{} 레이어 읽기 실패".format(layerName))
+                            # self.error(u"{} 레이어 읽기 실패".format(layerName))
+                            self.error(self.tr(u"Failed to read {} layer").format(layerName))
                 except Exception as e:
                     self.error(e)
                 finally:
@@ -1385,8 +1484,10 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
                 numLayer = len(selectedRasterLayerList) + len(selectedVectorLayerList)
                 self.progressMainWork.setMinimum(0)
                 self.progressMainWork.setMaximum(numLayer)
-                self.lblMainWork.setText(u"기존 지오패키지 읽는 중...")
-                self.info(u"지오패키지 불러오기 시작")
+                # self.lblMainWork.setText(u"기존 지오패키지 읽는 중...")
+                self.lblMainWork.setText(self.tr("Loading existing GeoPackage..."))
+                # self.info(u"지오패키지 불러오기 시작")
+                self.info(self.tr("Starting GeoPackage import"))
 
                 iLayer = 0
                 self.progressSubWork.setMinimum(0)
@@ -1397,7 +1498,8 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
                     iLayer += 1
                     self.progressMainWork.setValue(iLayer)
                     self.progressSubWork.setValue(iLayer)
-                    self.lblSubWork.setText(u"레이어 읽는 중({}/{})...".format(iLayer, numLayer))
+                    # self.lblSubWork.setText(u"레이어 읽는 중({}/{})...".format(iLayer, numLayer))
+                    self.lblSubWork.setText(self.tr("Loading layer({}/{})...").format(iLayer, numLayer))
                     force_gui_update()
                     if self.forceStop:
                         raise StoppedByUserException()
@@ -1407,14 +1509,16 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
                     except:
                         layer = None
                     if not layer:
-                        self.error(u"{} 레이어 읽기 실패".format(layerName))
+                        # self.error(u"{} 레이어 읽기 실패".format(layerName))
+                        self.error(self.tr(u"Failed to read {} layer").format(layerName))
 
                 # 벡터 로딩
                 for layerName in selectedVectorLayerList:
                     iLayer += 1
                     self.progressMainWork.setValue(iLayer)
                     self.progressSubWork.setValue(iLayer)
-                    self.lblSubWork.setText(u"레이어 읽는 중({}/{})...".format(iLayer, numLayer))
+                    # self.lblSubWork.setText(u"레이어 읽는 중({}/{})...".format(iLayer, numLayer))
+                    self.lblSubWork.setText(self.tr("Loading layer({}/{})...").format(iLayer, numLayer))
                     force_gui_update()
                     if self.forceStop:
                         raise StoppedByUserException()
@@ -1428,19 +1532,23 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
                     except:
                         layer = None
                     if not layer:
-                        self.error(u"{} 레이어 읽기 실패".format(layerName))
+                        # self.error(u"{} 레이어 읽기 실패".format(layerName))
+                        self.error(self.tr(u"Failed to read {} layer").format(layerName))
 
         except StoppedByUserException:
             QgsApplication.restoreOverrideCursor()
-            self.error(u"사용자에 의해 중지됨")
+            # self.error(u"사용자에 의해 중지됨")
+            self.error(self.tr("Suspended by user"))
             return False
         except Exception as e:
             self.error(e)
             QgsApplication.restoreOverrideCursor()
-            self.error(u"영상 가져오기 실패")
+            # self.error(u"영상 가져오기 실패")
+            self.error(self.tr("Photo import failed"))
             return False
 
         QgsApplication.restoreOverrideCursor()
-        self.info(u"지오패키지 불러오기 완료")
+        # self.info(u"지오패키지 불러오기 완료")
+        self.info(self.tr("GeoPackage import complete"))
 
         return True
