@@ -32,6 +32,7 @@ The QGIS Plugin for loading Korea NGII OnMap(PDF Map)
 
       ![Plugin Manager](images/install_pluginmamager.png)
    - ~~[플러그인 설치] 버튼을 눌러 설치하면 끝~~
+   
    - 아직 QGIS Plugin Repository 에서 승인이 안나서 임시적인 방법을 안내합니다.
    - 다음 경로에서 플러그인 압축파일을 다운로드 합니다. https://github.com/Gaia3D/OnMapLoader/raw/master/release/OnMapLoader_1.2.zip
    - 사용자 폴더에 있는 .qgis2 폴더 아래의 python/plugins 폴더 아래에 압축파일을 풀어 줍니다.
