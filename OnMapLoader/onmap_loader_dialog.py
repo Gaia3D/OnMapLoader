@@ -32,8 +32,6 @@ import ConfigParser
 
 import sys
 import os
-ext_lib_path = os.path.join(QgsApplication.qgisSettingsDirPath(),"python",'lib')
-sys.path.append(ext_lib_path)
 
 # import OGR
 from osgeo import ogr, gdal, osr
@@ -45,10 +43,6 @@ from PyPDF2.pdf import *
 
 from PIL import Image
 from io import BytesIO
-
-
-def tr(message):
-    return QCoreApplication.translate('OnMapLoader', message)
 
 
 # 기본 설정값
@@ -417,7 +411,7 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
                 return
 
             # self.order(u"레이어를 선택하고 [온맵 변환 시작] 버튼을 눌러주세요.")
-            self.order(tr("Select the layer and press the [Convert OnMap] button."))
+            self.order(self.tr("Select the layer and press the [Convert OnMap] button."))
             self.btnStart.setEnabled(True)
         else:
             # GPKG에서 읽는 경우
@@ -427,7 +421,7 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
             rc = self.fillLayerTreeFromGpkg()
             if not rc:
                 # self.error(u"지오패키지(GPKG) 파일에서 레이어 정보를 읽지 못했습니다.")
-                self.error(tr("Failed to read layer information from GeoPackage(GPKG) file."))
+                self.error(self.tr("Failed to read layer information from GeoPackage(GPKG) file."))
                 return
 
             # self.order(u"레이어를 선택하고 [지오패키지 읽기 시작] 버튼을 눌러주세요.")
@@ -1067,31 +1061,10 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
                     feature.SetField("GID", fid)
 
                     # collect vertex
-                    if geometry.GetGeometryCount() <= 0:
-                        pointList = geometry.GetPoints()
-                        srcNpArray = np.array(pointList, dtype=np.float32)
-
-                        # transform all vertex
-                        tgtNpList = self.affineTransform(srcNpArray)
-
-                        # move vertex
-                        for i in range(0, len(srcNpArray)):
-                            geometry.SetPoint(i, tgtNpList[i][0], tgtNpList[i][1])
-                    else:
-                        for geomId in range(geometry.GetGeometryCount()):
-                            geom = geometry.GetGeometryRef(geomId)
-                            pointList = geom.GetPoints()
-                            srcNpArray = np.array(pointList, dtype=np.float32)
-
-                            # transform all vertex
-                            tgtNpList = self.affineTransform(srcNpArray)
-
-                            # move vertex
-                            for i in range(0, len(srcNpArray)):
-                                geom.SetPoint(i, tgtNpList[i][0], tgtNpList[i][1])
-
+                    self._TransformGeom(geometry)
                     feature.SetGeometry(geometry)
                     vLayer.CreateFeature(feature)
+
                     feature = None
 
             # self.info(u"벡터 가져오기 완료")
@@ -1110,6 +1083,24 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
 
         QgsApplication.restoreOverrideCursor()
         return True
+
+
+    def _TransformGeom(self, geometry):
+        if geometry.GetGeometryCount() == 0:
+            pointList = geometry.GetPoints()
+            srcNpArray = np.array(pointList, dtype=np.float32)
+
+            # transform all vertex
+            tgtNpList = self.affineTransform(srcNpArray)
+
+            # move vertex
+            for i in range(0, len(srcNpArray)):
+                geometry.SetPoint(i, tgtNpList[i][0], tgtNpList[i][1])
+        else:
+            for geomId in range(geometry.GetGeometryCount()):
+                subGeom = geometry.GetGeometryRef(geomId)
+                self._TransformGeom(subGeom)
+
 
     def importPdfRaster(self):
         QgsApplication.setOverrideCursor(Qt.WaitCursor)

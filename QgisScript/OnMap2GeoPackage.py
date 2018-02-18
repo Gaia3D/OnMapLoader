@@ -25,6 +25,7 @@ import struct
 import tempfile
 import timeit
 import math
+import threading, time
 
 import PyPDF2
 from PyPDF2.filters import *
@@ -39,7 +40,7 @@ ogr.UseExceptions()
 LAYER_FILTER = re.compile(u"^지도정보_")
 MAP_BOX_LAYER = u"지도정보_도곽"
 MAP_CLIP_LAYER = u"지도정보_Other"
-PDF_FILE_NAME = u"C:\\Temp\\(B090)온맵_35812085.pdf"
+PDF_FILE_NAME = u"C:\\Temp\\(B090)온맵_358124.pdf"
 # PDF_FILE_NAME = u"C:\\Temp\\(B090)온맵_376124.pdf"
 # PDF_FILE_NAME = u"C:\\Temp\\(B090)온맵_37612.pdf"
 # PDF_FILE_NAME = u"C:\\Temp\\(B090)온맵_NJ52-7.pdf"
@@ -223,6 +224,11 @@ def getPdfInformation_test(pdfFilePath):
         if operator != "BDC":
             continue
 
+gPdf = None
+def threadOpenPdf(pdfFilePath):
+    srcDriver = ogr.GetDriverByName("PDF")
+    gPdf = srcDriver.Open(pdfFilePath, 0)
+
 
 def getPdfInformation(pdfFilePath):
     message(u"PDF 파일에서 정보추출 시작...")
@@ -237,14 +243,24 @@ def getPdfInformation(pdfFilePath):
         message(u"해석할 수 없는 도엽명이어서 중단됩니다.")
         return
 
-    # get the driver
-    srcDriver = ogr.GetDriverByName("PDF")
-
     # opening the PDF
     crr = calcTime()
     print "PDF Open: ",
     try:
+        srcDriver = ogr.GetDriverByName("PDF")
         pdf = srcDriver.Open(pdfFilePath, 0)
+
+        # gPdf = None
+        # trPdfOpen = threading.Thread(target=threadOpenPdf, args=(pdfFilePath,))
+        # trPdfOpen.daemon = True
+        # trPdfOpen.start()
+        #
+        # while not gPdf:
+        #     time.sleep(1)
+        #     print ".",
+        #
+        # pdf = gPdf
+
     except Exception, e:
         print e
         return
@@ -363,7 +379,6 @@ def importPdfVector(pdf, gpkg, layerInfoList, affineTransform, crsId, mapNo, bbo
         vLineLayer = None
         vPolygonLayer = None
 
-        # TODO: 사용자로 부터 옵션 받게 수정
         # 지도정보_ 로 시작하는 레이어만 임포트
         if not LAYER_FILTER.match(layerInfo["name"]):
             continue
@@ -410,37 +425,59 @@ def importPdfVector(pdf, gpkg, layerInfoList, affineTransform, crsId, mapNo, bbo
             feature.SetField("GID", fid)
 
             # collect vertex
-            if geometry.GetGeometryCount() <= 0:
-                pointList = geometry.GetPoints()
-                srcNpArray = np.array(pointList, dtype=np.float32)
+            # if geometry.GetGeometryCount() <= 0:
+            #     pointList = geometry.GetPoints()
+            #     srcNpArray = np.array(pointList, dtype=np.float32)
+            #
+            #     # transform all vertex
+            #     tgtNpList = affineTransform(srcNpArray)
+            #
+            #     # move vertex
+            #     for i in range(0, len(srcNpArray)):
+            #         geometry.SetPoint(i, tgtNpList[i][0], tgtNpList[i][1])
+            # else:
+            #     for geomId in range(geometry.GetGeometryCount()):
+            #         geom = geometry.GetGeometryRef(geomId)
+            #
+            #         pointList = geom.GetPoints()
+            #         srcNpArray = np.array(pointList, dtype=np.float32)
+            #
+            #
+            #         # transform all vertex
+            #         tgtNpList = affineTransform(srcNpArray)
+            #
+            #         # move vertex
+            #         for i in range(0, len(srcNpArray)):
+            #             geom.SetPoint(i, tgtNpList[i][0], tgtNpList[i][1])
 
-                # transform all vertex
-                tgtNpList = affineTransform(srcNpArray)
-
-                # move vertex
-                for i in range(0, len(srcNpArray)):
-                    geometry.SetPoint(i, tgtNpList[i][0], tgtNpList[i][1])
-            else:
-                for geomId in range(geometry.GetGeometryCount()):
-                    geom = geometry.GetGeometryRef(geomId)
-                    pointList = geom.GetPoints()
-                    srcNpArray = np.array(pointList, dtype=np.float32)
-
-                    # transform all vertex
-                    tgtNpList = affineTransform(srcNpArray)
-
-                    # move vertex
-                    for i in range(0, len(srcNpArray)):
-                        geom.SetPoint(i, tgtNpList[i][0], tgtNpList[i][1])
+            g_TransformGeom(geometry, affineTransform)
 
             feature.SetGeometry(geometry)
             vLayer.CreateFeature(feature)
+
             feature = None
 
         print u"Layer: {} - ".format(layerInfo["name"]),
         prvTime = calcTime(prvTime)
 
     return createdLayerName
+
+
+def g_TransformGeom(geometry, affineTransform):
+    if geometry.GetGeometryCount() == 0:
+        pointList = geometry.GetPoints()
+        srcNpArray = np.array(pointList, dtype=np.float32)
+
+        # transform all vertex
+        tgtNpList = affineTransform(srcNpArray)
+
+        # move vertex
+        for i in range(0, len(srcNpArray)):
+            geometry.SetPoint(i, tgtNpList[i][0], tgtNpList[i][1])
+    else:
+        for geomId in range(geometry.GetGeometryCount()):
+            subGeom = geometry.GetGeometryRef(geomId)
+            g_TransformGeom(subGeom, affineTransform)
 
 
 def importPdfRaster(pdfFilePath, gpkgFileNale, crsId, imgBox):
