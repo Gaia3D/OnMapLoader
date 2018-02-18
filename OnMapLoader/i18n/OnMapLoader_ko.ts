@@ -44,16 +44,6 @@ Please acquire GeoPDF Plugin from the following path and install it again.</sour
         <source>Sorry, 250k scale map boxes are not supported.</source>
         <translation>죄송합니다.25만 도엽은 지원되지 않습니다.</translation>
     </message>
-    <message>
-        <location filename="onmap_loader_dialog.py" line="371"/>
-        <source>Open OnMap(PDF) file</source>
-        <translation>온맵(PDF) 파일 열기</translation>
-    </message>
-    <message>
-        <location filename="onmap_loader_dialog.py" line="373"/>
-        <source>OnMap(*.pdf)</source>
-        <translation>온맵(*.pdf)</translation>
-    </message>
 </context>
 <context>
     <name>OnMapLoader</name>
@@ -184,7 +174,7 @@ Click [No] to regenerate the geo-package file.</source>
         <translation>지오패키지(GPKG) 파일을 만들지 못했습니다.</translation>
     </message>
     <message>
-        <location filename="onmap_loader_dialog.py" line="1409"/>
+        <location filename="onmap_loader_dialog.py" line="1424"/>
         <source>PHOTO</source>
         <translation>영상</translation>
     </message>
@@ -233,177 +223,177 @@ Forcibly stop can also cause errors.</source>
         <translation>해석할 수 없는 도엽명이어서 중단됩니다.</translation>
     </message>
     <message>
-        <location filename="onmap_loader_dialog.py" line="857"/>
+        <location filename="onmap_loader_dialog.py" line="872"/>
         <source>Information extraction completed.</source>
         <translation>정보추출 완료.</translation>
     </message>
     <message>
-        <location filename="onmap_loader_dialog.py" line="859"/>
+        <location filename="onmap_loader_dialog.py" line="874"/>
         <source>Waiting for work</source>
         <translation>작업 대기중</translation>
     </message>
     <message>
-        <location filename="onmap_loader_dialog.py" line="878"/>
+        <location filename="onmap_loader_dialog.py" line="893"/>
         <source>Analyzing the selected GeoPackage file...</source>
         <translation>선택한 지오패키지 파일 분석중...</translation>
     </message>
     <message>
-        <location filename="onmap_loader_dialog.py" line="880"/>
+        <location filename="onmap_loader_dialog.py" line="895"/>
         <source>Start extracting information from GPKG file...</source>
         <translation>GPKG 파일에서 정보추출 시작...</translation>
     </message>
     <message>
-        <location filename="onmap_loader_dialog.py" line="920"/>
+        <location filename="onmap_loader_dialog.py" line="935"/>
         <source>GeoPackage information extraction complete</source>
         <translation>지오패키지 정보추출 완료</translation>
     </message>
     <message>
-        <location filename="onmap_loader_dialog.py" line="952"/>
+        <location filename="onmap_loader_dialog.py" line="967"/>
         <source>Unable to recreate {} file. Maybe you are using it.</source>
         <translation>{} 파일을 다시 만들 수 없습니다. 아마 사용중인 듯 합니다.</translation>
     </message>
     <message>
-        <location filename="onmap_loader_dialog.py" line="970"/>
+        <location filename="onmap_loader_dialog.py" line="985"/>
         <source>Start extracting vector information from PDF...</source>
         <translation>PDF에서 벡터정보 추출 시작...</translation>
     </message>
     <message>
-        <location filename="onmap_loader_dialog.py" line="991"/>
+        <location filename="onmap_loader_dialog.py" line="1006"/>
         <source>Processing {} layer({}/{})...</source>
         <translation>{} 레이어 처리중({}/{})...</translation>
     </message>
     <message>
-        <location filename="onmap_loader_dialog.py" line="1015"/>
+        <location filename="onmap_loader_dialog.py" line="1030"/>
         <source>Extracting object ({}/{})...</source>
         <translation>객체 추출중 ({}/{})...</translation>
     </message>
     <message>
-        <location filename="onmap_loader_dialog.py" line="1071"/>
+        <location filename="onmap_loader_dialog.py" line="1086"/>
         <source>Vector import complete</source>
         <translation>벡터 가져오기 완료</translation>
     </message>
     <message>
-        <location filename="onmap_loader_dialog.py" line="1532"/>
+        <location filename="onmap_loader_dialog.py" line="1547"/>
         <source>Suspended by user</source>
         <translation>사용자에 의해 중지됨</translation>
     </message>
     <message>
-        <location filename="onmap_loader_dialog.py" line="1080"/>
+        <location filename="onmap_loader_dialog.py" line="1095"/>
         <source>Vector import failed</source>
         <translation>벡터 가져오기 실패</translation>
     </message>
     <message>
-        <location filename="onmap_loader_dialog.py" line="1109"/>
+        <location filename="onmap_loader_dialog.py" line="1124"/>
         <source>Start extracting photo information</source>
         <translation>영상 정보 추출시작</translation>
     </message>
     <message>
-        <location filename="onmap_loader_dialog.py" line="1122"/>
+        <location filename="onmap_loader_dialog.py" line="1137"/>
         <source>Can not import because there is no photo layer.</source>
         <translation>영상 레이어가 없어 가져올 수 없습니다.</translation>
     </message>
     <message>
-        <location filename="onmap_loader_dialog.py" line="1126"/>
+        <location filename="onmap_loader_dialog.py" line="1141"/>
         <source>Extracting photo fragments...</source>
         <translation>영상 조각 추출중...</translation>
     </message>
     <message>
-        <location filename="onmap_loader_dialog.py" line="1140"/>
+        <location filename="onmap_loader_dialog.py" line="1155"/>
         <source>Photo fragments processing({}/{})...</source>
         <translation>영상 조각 처리중({}/{})...</translation>
     </message>
     <message>
-        <location filename="onmap_loader_dialog.py" line="1235"/>
+        <location filename="onmap_loader_dialog.py" line="1250"/>
         <source>Start merging photo</source>
         <translation>영상 병합 시작</translation>
     </message>
     <message>
-        <location filename="onmap_loader_dialog.py" line="1238"/>
+        <location filename="onmap_loader_dialog.py" line="1253"/>
         <source>Merging photo fragments...</source>
         <translation>영상 병합중...</translation>
     </message>
     <message>
-        <location filename="onmap_loader_dialog.py" line="1257"/>
+        <location filename="onmap_loader_dialog.py" line="1272"/>
         <source>Processing photo fragments({}/{})...</source>
         <translation>영상 조각 처리중({}/{})...</translation>
     </message>
     <message>
-        <location filename="onmap_loader_dialog.py" line="1287"/>
+        <location filename="onmap_loader_dialog.py" line="1302"/>
         <source>Start saving merged photo into GeoPackage</source>
         <translation>병합된 영상을 지오패키지에 저장 시작</translation>
     </message>
     <message>
-        <location filename="onmap_loader_dialog.py" line="1290"/>
+        <location filename="onmap_loader_dialog.py" line="1305"/>
         <source>Saving merged photo...</source>
         <translation>병합된 영상 저장중...</translation>
     </message>
     <message>
-        <location filename="onmap_loader_dialog.py" line="1298"/>
+        <location filename="onmap_loader_dialog.py" line="1313"/>
         <source>Saving photo...</source>
         <translation>영상 저장중...</translation>
     </message>
     <message>
-        <location filename="onmap_loader_dialog.py" line="1322"/>
+        <location filename="onmap_loader_dialog.py" line="1337"/>
         <source>RASTER_TABLE=PHOTO</source>
         <translation>RASTER_TABLE=영상</translation>
     </message>
     <message>
-        <location filename="onmap_loader_dialog.py" line="1538"/>
+        <location filename="onmap_loader_dialog.py" line="1553"/>
         <source>Photo import failed</source>
         <translation>영상 가져오기 실패</translation>
     </message>
     <message>
-        <location filename="onmap_loader_dialog.py" line="1393"/>
+        <location filename="onmap_loader_dialog.py" line="1408"/>
         <source>Photo processing completed</source>
         <translation>영상 처리 완료</translation>
     </message>
     <message>
-        <location filename="onmap_loader_dialog.py" line="1395"/>
+        <location filename="onmap_loader_dialog.py" line="1410"/>
         <source>Photo import completed</source>
         <translation>영상 가져오기 완료</translation>
     </message>
     <message>
-        <location filename="onmap_loader_dialog.py" line="1414"/>
+        <location filename="onmap_loader_dialog.py" line="1429"/>
         <source>Photo layer load failed</source>
         <translation>영상 레이어 읽기 실패</translation>
     </message>
     <message>
-        <location filename="onmap_loader_dialog.py" line="1430"/>
+        <location filename="onmap_loader_dialog.py" line="1445"/>
         <source>Loading the converted GeoPackage...</source>
         <translation>변환된 지오패키지 읽는 중...</translation>
     </message>
     <message>
-        <location filename="onmap_loader_dialog.py" line="1432"/>
+        <location filename="onmap_loader_dialog.py" line="1447"/>
         <source>Starting GeoPackage loading</source>
         <translation>지오패키지 불러오기 시작</translation>
     </message>
     <message>
-        <location filename="onmap_loader_dialog.py" line="1441"/>
+        <location filename="onmap_loader_dialog.py" line="1456"/>
         <source>Reading vector layer({}/{})...</source>
         <translation>벡터 레이어 읽는 중({}/{})...</translation>
     </message>
     <message>
-        <location filename="onmap_loader_dialog.py" line="1527"/>
+        <location filename="onmap_loader_dialog.py" line="1542"/>
         <source>Failed to read {} layer</source>
         <translation>{} 레이어 읽기 실패</translation>
     </message>
     <message>
-        <location filename="onmap_loader_dialog.py" line="1479"/>
+        <location filename="onmap_loader_dialog.py" line="1494"/>
         <source>Loading existing GeoPackage...</source>
         <translation>기존 지오패키지 읽는 중...</translation>
     </message>
     <message>
-        <location filename="onmap_loader_dialog.py" line="1481"/>
+        <location filename="onmap_loader_dialog.py" line="1496"/>
         <source>Starting GeoPackage import</source>
         <translation>지오패키지 불러오기 시작</translation>
     </message>
     <message>
-        <location filename="onmap_loader_dialog.py" line="1512"/>
+        <location filename="onmap_loader_dialog.py" line="1527"/>
         <source>Loading layer({}/{})...</source>
         <translation>레이어 읽는 중({}/{})...</translation>
     </message>
     <message>
-        <location filename="onmap_loader_dialog.py" line="1543"/>
+        <location filename="onmap_loader_dialog.py" line="1558"/>
         <source>GeoPackage import complete</source>
         <translation>지오패키지 불러오기 완료</translation>
     </message>
@@ -423,7 +413,7 @@ Forcibly stop can also cause errors.</source>
         <translation>변환대상 온맵(PDF) 파일:</translation>
     </message>
     <message>
-        <location filename="onmap_loader_dialog.py" line="891"/>
+        <location filename="onmap_loader_dialog.py" line="906"/>
         <source>Open GeoPackage Error</source>
         <translation>지오패키지 열기 오류</translation>
     </message>
@@ -431,6 +421,32 @@ Forcibly stop can also cause errors.</source>
         <location filename="onmap_loader_dialog.py" line="414"/>
         <source>Select the layer and press the [Convert OnMap] button.</source>
         <translation>레이어를 선택하고 [온맵 변환 시작] 버튼을 눌러주세요.</translation>
+    </message>
+    <message>
+        <location filename="onmap_loader_dialog.py" line="371"/>
+        <source>Open OnMap(PDF) file</source>
+        <translation>온맵(PDF) 파일 열기</translation>
+    </message>
+    <message>
+        <location filename="onmap_loader_dialog.py" line="373"/>
+        <source>OnMap(*.pdf)</source>
+        <translation>온맵(*.pdf)</translation>
+    </message>
+    <message>
+        <location filename="onmap_loader_dialog.py" line="755"/>
+        <source>Confirm Continue</source>
+        <translation>계속 진행 확인</translation>
+    </message>
+    <message>
+        <location filename="onmap_loader_dialog.py" line="755"/>
+        <source>The OnMap file you choose can take a very long time to convert.
+It may look like the program is dead.
+
+Still want to convert?</source>
+        <translation>선택하신 온맵은 변환시간이 매우 오래 걸릴 수 있습니다.
+때문에 마치 프로그램이 죽은 것처럼 보일 수 있습니다.
+
+그래도 계속 변환하시겠습니까?</translation>
     </message>
 </context>
 </TS>

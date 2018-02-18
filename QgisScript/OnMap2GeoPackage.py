@@ -40,7 +40,8 @@ ogr.UseExceptions()
 LAYER_FILTER = re.compile(u"^지도정보_")
 MAP_BOX_LAYER = u"지도정보_도곽"
 MAP_CLIP_LAYER = u"지도정보_Other"
-PDF_FILE_NAME = u"C:\\Temp\\(B090)온맵_358124.pdf"
+PDF_FILE_NAME = u"C:\\Temp\\(B090)온맵_37612068.pdf"
+# PDF_FILE_NAME = u"C:\\Temp\\(B090)온맵_358124.pdf"
 # PDF_FILE_NAME = u"C:\\Temp\\(B090)온맵_376124.pdf"
 # PDF_FILE_NAME = u"C:\\Temp\\(B090)온맵_37612.pdf"
 # PDF_FILE_NAME = u"C:\\Temp\\(B090)온맵_NJ52-7.pdf"
@@ -224,10 +225,11 @@ def getPdfInformation_test(pdfFilePath):
         if operator != "BDC":
             continue
 
-gPdf = None
+
 def threadOpenPdf(pdfFilePath):
     srcDriver = ogr.GetDriverByName("PDF")
-    gPdf = srcDriver.Open(pdfFilePath, 0)
+    pdf = srcDriver.Open(pdfFilePath, 0)
+    return pdf
 
 
 def getPdfInformation(pdfFilePath):

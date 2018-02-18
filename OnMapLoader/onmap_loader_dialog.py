@@ -274,7 +274,7 @@ def mapNoToMapBox(mapNo):
     pntTL = (minLon, maxLat)
     pntTR = (maxLon, maxLat)
 
-    return pntLL, pntLR, pntTL, pntTR
+    return pntLL, pntLR, pntTL, pntTR, scale
 
 
 #########################
@@ -368,9 +368,9 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
     def _on_click_btnSrcFile(self):
         qfd = QFileDialog()
         # title = u"온맵(PDF) 파일 열기"
-        title = tr("Open OnMap(PDF) file")
+        title = self.tr("Open OnMap(PDF) file")
         # ext = u"온맵(*.pdf)"
-        ext = tr("OnMap(*.pdf)")
+        ext = self.tr("OnMap(*.pdf)")
         pdfPath = os.path.dirname(self.pdfPath)
         path = QFileDialog.getOpenFileName(qfd, caption=title, directory=pdfPath, filter=ext)
 
@@ -738,7 +738,7 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
             return
 
         try:
-            boxLL, boxLR, boxTL, boxTR = mapNoToMapBox(mapNo)
+            boxLL, boxLR, boxTL, boxTR, scale = mapNoToMapBox(mapNo)
         except NotImplementedError as e:
             self.error(repr(e))
         except:
@@ -746,11 +746,26 @@ class OnMapLoaderDialog(QtGui.QDialog, FORM_CLASS):
             self.error(self.tr("The map name can not be interpreted, so it will stop."))
             return
 
-        # get the driver
-        srcDriver = ogr.GetDriverByName("PDF")
+        if scale != 5000:
+            # rc = QMessageBox.question(self, self.tr(u"계속 진행 확인"),
+            #                           self.tr(u"선택하신 온맵은 변환시간이 매우 오래 걸릴 수 있습니다.\n"
+            #                                   u"때문에 마치 프로그램이 죽은 것처럼 보일 수 있습니다.\n\n"
+            #                                   u"그래도 계속 변환하시겠습니까?"),
+            #                           QMessageBox.Yes | QMessageBox.No)
+            rc = QMessageBox.question(self, self.tr("Confirm Continue"),
+                                      self.tr("The OnMap file you choose can take a very long time to convert.\n"
+                                              "It may look like the program is dead.\n\n"
+                                              "Still want to convert?"),
+                                      QMessageBox.Yes | QMessageBox.No)
 
-        # opening the PDF
+            if rc != QMessageBox.Yes:
+                return
+
         try:
+            # get the driver
+            srcDriver = ogr.GetDriverByName("PDF")
+
+            # opening the PDF
             pdf = srcDriver.Open(self.pdfPath, 0)
         except Exception, e:
             self.error(unicode(e))
